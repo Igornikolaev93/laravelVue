@@ -7,82 +7,105 @@
         <div class="sidebar">
             <div class="account-name">Hotels</div>
             <div class="menu">
-                <div class="menu-item">
-                    <span class="menu-icon">O</span>
-                    <span>Dashboard</span>
-                </div>
                 <div class="menu-item active">
                     <span class="menu-icon">O</span>
                     <span>Reviews</span>
-                </div>
-                <div class="menu-item">
-                    <span class="menu-icon">O</span>
-                    <span>UI Elements</span>
-                </div>
-                <div class="menu-item">
-                    <span class="menu-icon">O</span>
-                    <span>Settings</span>
                 </div>
             </div>
         </div>
 
         <!-- Content -->
         <div class="content">
-            @if ($settings && $settings->yandex_maps_url)
-                <!-- Rating Block -->
-                <div class="rating-platform">
-                    <div class="rating-block">
-                        <span class="rating-icon">Y</span>
-                        <span class="platform-name">Яндекс Карты</span>
+            <!-- URL Input Form -->
+            <div class="url-form-container">
+                <form action="{{ route('yandex-maps.index') }}" method="POST">
+                    @csrf
+                    <input type="text" name="yandex_maps_url" class="url-input" placeholder="Enter Yandex Maps URL" value="{{ $settings->yandex_maps_url ?? '' }}" required>
+                    <button type="submit" class="submit-button">Fetch Reviews</button>
+                </form>
+                @if ($errors->any())
+                    <div class="alert alert-danger" style="margin-top: 10px;">
+                        {{ $errors->first() }}
                     </div>
-                    <div class="rating-stars-block">
-                        <span class="rating-value">{{ $settings->rating ?? 'N/A' }}</span>
-                        <div class="stars">
-                            @php
-                                $rating = round((float)($settings->rating ?? 0));
-                                echo str_repeat('★', $rating) . str_repeat('☆', 5 - $rating);
-                            @endphp
-                        </div>
-                        <div class="total-reviews">
-                            {{ $settings->total_reviews ?? '0' }} отзывов
-                        </div>
+                @endif
+                @if (session('error'))
+                    <div class="alert alert-danger" style="margin-top: 10px;">
+                        {{ session('error') }}
                     </div>
-                </div>
+                @endif
+                @if (session('success'))
+                    <div class="alert alert-success" style="margin-top: 10px;">
+                        {{ session('success') }}
+                    </div>
+                @endif
+            </div>
 
-                <!-- Reviews List -->
-                @forelse ($reviews as $review)
-                    <div class="review-card">
-                        <div class="review-header">
-                            <span>{{ $review['date'] }}</span>
+            @if ($settings && $settings->yandex_maps_url)
+                @if (count($reviews) > 0)
+                    <!-- Rating Block -->
+                    <div class="rating-platform">
+                        <div class="rating-block">
+                            <span class="rating-icon">Y</span>
+                            <span class="platform-name">Яндекс Карты</span>
                         </div>
-                        <div class="review-author-info">
-                            <span class="review-author">{{ $review['author'] }}</span>
-                            <div class="stars" style="font-size: 16px;">
+                        <div class="rating-stars-block">
+                            <span class="rating-value">{{ $settings->rating ?? 'N/A' }}</span>
+                            <div class="stars">
                                 @php
-                                    $reviewRating = round((float)($review['rating'] ?? 0));
-                                    echo str_repeat('★', $reviewRating) . str_repeat('☆', 5 - $reviewRating);
+                                    $rating = round((float)($settings->rating ?? 0));
+                                    echo str_repeat('★', $rating) . str_repeat('☆', 5 - $rating);
                                 @endphp
                             </div>
-                        </div>
-                        <div class="review-text">
-                            {{ $review['text'] }}
+                            <div class="total-reviews">
+                                {{ $settings->total_reviews ?? '0' }} отзывов
+                            </div>
                         </div>
                     </div>
-                @empty
+
+                    <!-- Reviews List -->
+                    @forelse ($reviews as $review)
+                        <div class="review-card">
+                            <div class="review-header">
+                                <span>{{ $review['date'] }}</span>
+                            </div>
+                            <div class="review-author-info">
+                                <span class="review-author">{{ $review['author'] }}</span>
+                                <div class="stars" style="font-size: 16px;">
+                                    @php
+                                        $reviewRating = round((float)($review['rating'] ?? 0));
+                                        echo str_repeat('★', $reviewRating) . str_repeat('☆', 5 - $reviewRating);
+                                    @endphp
+                                </div>
+                            </div>
+                            <div class="review-text">
+                                {{ $review['text'] }}
+                            </div>
+                        </div>
+                    @empty
+                        <div class="review-card">
+                            <div class="review-text">
+                                No reviews found for this URL, or the service is temporarily unavailable.
+                            </div>
+                        </div>
+                    @endforelse
+
+                    <!-- Pagination -->
+                    <div class="pagination-container" style="margin-top: 20px;">
+                        {{ $reviews->appends(['sort' => $sort])->links() }}
+                    </div>
+                @else
                     <div class="review-card">
                         <div class="review-text">
-                            No reviews found or the service is temporarily unavailable.
+                            No reviews found for this URL. Please check the URL and try again.
                         </div>
                     </div>
-                @endforelse
-
-                <!-- Pagination -->
-                <div class="pagination-container" style="margin-top: 20px;">
-                    {{ $reviews->appends(['sort' => $sort])->links() }}
-                </div>
-
+                @endif
             @else
-                <p>Please configure the Yandex Maps URL in the <a href="{{ route('yandex-maps.settings') }}">settings</a>.</p>
+                <div class="review-card">
+                    <div class="review-text">
+                        Please provide a Yandex Maps URL above to fetch reviews.
+                    </div>
+                </div>
             @endif
         </div>
     </div>

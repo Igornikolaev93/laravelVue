@@ -13,6 +13,19 @@ class YandexMapsController extends Controller
 {
     public function index(Request $request)
     {
+        if ($request->isMethod('post')) {
+            $validated = $request->validate([
+                'yandex_maps_url' => 'required|url',
+            ]);
+
+            YandexMapsSettings::updateOrCreate(
+                ['id' => 1],
+                ['yandex_maps_url' => $validated['yandex_maps_url']]
+            );
+
+            return redirect()->route('yandex-maps.index')->with('success', 'URL saved. Fetching reviews...');
+        }
+
         $settings = YandexMapsSettings::first();
         $reviews = [];
 
@@ -23,8 +36,6 @@ class YandexMapsController extends Controller
                         'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                         'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
                         'Accept-Language' => 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
-                        'Cache-Control' => 'no-cache',
-                        'Pragma' => 'no-cache'
                     ],
                     'timeout' => 30,
                     'verify' => false
@@ -36,24 +47,19 @@ class YandexMapsController extends Controller
                 
                 $this->updateRatingAndReviewsCount($document, $settings);
                 
-                Log::info('Trying to parse reviews from JSON-LD');
                 $jsonScripts = $document->find('script[type="application/ld+json"]');
-
                 foreach ($jsonScripts as $script) {
                     $jsonContent = json_decode($script->text(), true);
-                    if (json_last_error() !== JSON_ERROR_NONE) {
-                        continue;
-                    }
-                    $foundReviews = $this->findReviewsInJson($jsonContent);
-                    if (!empty($foundReviews)) {
-                        $reviews = $foundReviews;
-                        Log::info('Found ' . count($reviews) . ' reviews in JSON-LD');
-                        break;
+                    if (json_last_error() === JSON_ERROR_NONE) {
+                        $foundReviews = $this->findReviewsInJson($jsonContent);
+                        if (!empty($foundReviews)) {
+                            $reviews = $foundReviews;
+                            break;
+                        }
                     }
                 }
 
                 if (empty($reviews)) {
-                    Log::info('JSON-LD parsing failed. Falling back to HTML parsing.');
                     $reviewElements = $this->findReviews($document);
                     if (!empty($reviewElements)) {
                         foreach ($reviewElements as $element) {
@@ -64,11 +70,9 @@ class YandexMapsController extends Controller
                         }
                     }
                 }
-                
-                Log::info('Total found ' . count($reviews) . ' reviews');
-
             } catch (\Exception $e) {
                 Log::error('Failed to parse Yandex reviews: ' . $e->getMessage());
+                return back()->with('error', 'Failed to fetch reviews. Please check the URL.');
             }
         }
 
@@ -79,11 +83,13 @@ class YandexMapsController extends Controller
 
         $perPage = 5;
         $currentPage = $request->get('page', 1);
-        $currentPageReviews = array_slice($reviews, ($currentPage - 1) * $perPage, $perPage);
-        $paginatedReviews = new LengthAwarePaginator($currentPageReviews, count($reviews), $perPage, $currentPage, [
-            'path' => $request->url(),
-            'query' => $request->query(),
-        ]);
+        $paginatedReviews = new LengthAwarePaginator(
+            array_slice($reviews, ($currentPage - 1) * $perPage, $perPage),
+            count($reviews),
+            $perPage,
+            $currentPage,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
 
         return view('yandex-maps.index', [
             'settings' => $settings, 
@@ -92,68 +98,13 @@ class YandexMapsController extends Controller
         ]);
     }
     
-    private function updateRatingAndReviewsCount($document, $settings)
-    {
-        // ... (existing code) ...
-    }
+    private function updateRatingAndReviewsCount($document, $settings){ /* ... */ }
     
-    private function findReviewsInJson($data, $depth = 0)
-    {
-        if ($depth > 10) return [];
+    private function findReviewsInJson($data, $depth = 0){ /* ... */ }
 
-        if (is_array($data)) {
-            if (isset($data['review']) && is_array($data['review'])) {
-                return $this->parseJsonReviews($data['review']);
-            }
-            if (isset($data['reviews']) && is_array($data['reviews'])) {
-                return $this->parseJsonReviews($data['reviews']);
-            }
-
-            foreach ($data as $key => $value) {
-                $result = $this->findReviewsInJson($value, $depth + 1);
-                if (!empty($result)) {
-                    return $result;
-                }
-            }
-        }
-        return [];
-    }
-
-    private function parseJsonReviews($jsonReviews)
-    {
-        $parsed = [];
-        foreach ($jsonReviews as $item) {
-            $review = [
-                'author' => $item['author']['name'] ?? $item['author'] ?? 'N/A',
-                'rating' => $item['reviewRating']['ratingValue'] ?? $item['ratingValue'] ?? 'N/A',
-                'text'   => $item['reviewBody'] ?? $item['description'] ?? '',
-                'date'   => $item['datePublished'] ?? $item['dateCreated'] ?? '',
-            ];
-
-            if (!empty($review['text']) || $review['author'] !== 'N/A') {
-                $parsed[] = $review;
-            }
-        }
-        return $parsed;
-    }
+    private function parseJsonReviews($jsonReviews){ /* ... */ }
     
-    private function findReviews($document)
-    {
-        // ... (existing code) ...
-    }
+    private function findReviews($document){ /* ... */ }
     
-    private function parseReview($element)
-    {
-        // ... (existing code) ...
-    }
-
-    public function settings()
-    {
-        // ... (existing code) ...
-    }
-
-    public function saveSettings(Request $request)
-    {
-        // ... (existing code) ...
-    }
+    private function parseReview($element){ /* ... */ }
 }
