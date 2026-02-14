@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\YandexMapsSettings;
+use App\Models\YandexMapsSetting;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use GuzzleHttp\Client;
@@ -16,7 +16,7 @@ class YandexMapsController extends Controller
             $validated = $request->validate(['yandex_maps_url' => 'required|url']);
             
             // При сохранении нового URL сбрасываем старые данные
-            YandexMapsSettings::updateOrCreate(
+            YandexMapsSetting::updateOrCreate(
                 ['id' => 1], 
                 [
                     'yandex_maps_url' => $validated['yandex_maps_url'],
@@ -28,7 +28,7 @@ class YandexMapsController extends Controller
             return redirect()->route('yandex-maps.index')->with('success', 'URL saved. Fetching reviews...');
         }
 
-        $settings = YandexMapsSettings::first();
+        $settings = YandexMapsSetting::first();
         if (!$settings || !$settings->yandex_maps_url) {
             return view('yandex-maps.connect');
         }
