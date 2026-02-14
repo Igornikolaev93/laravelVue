@@ -27,6 +27,11 @@ class YandexMapsController extends Controller
         }
 
         $settings = YandexMapsSettings::first();
+
+        if (!$settings || !$settings->yandex_maps_url) {
+            return view('yandex-maps.connect');
+        }
+
         $reviews = [];
 
         if ($settings && $settings->yandex_maps_url) {

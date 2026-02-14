@@ -227,6 +227,11 @@ body {
     top: 180px;
 }
 
+.settings {
+    left: 65px;
+    top: 205px;
+}
+
 /* Account name */
 .account-name,
 [data-layer="3"] {
