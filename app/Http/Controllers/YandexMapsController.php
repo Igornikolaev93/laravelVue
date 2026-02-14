@@ -5,26 +5,61 @@ namespace App\Http\Controllers;
 use App\Models\YandexMapsSettings;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
+use GuzzleHttp\Client;
+use DiDom\Document;
+use Illuminate\Support\Facades\Log;
 
 class YandexMapsController extends Controller
 {
     public function index(Request $request)
     {
         $settings = YandexMapsSettings::first();
-        
-        // Dummy data for reviews
-        $reviews = [
-            ['author' => 'John Doe', 'rating' => 5, 'text' => 'Excellent!', 'date' => '2024-05-20'],
-            ['author' => 'Jane Smith', 'rating' => 4, 'text' => 'Very good.', 'date' => '2024-05-19'],
-            ['author' => 'Peter Jones', 'rating' => 3, 'text' => 'Good.', 'date' => '2024-05-21'],
-            ['author' => 'Mary Williams', 'rating' => 2, 'text' => 'Could be better.', 'date' => '2024-05-18'],
-            ['author' => 'David Brown', 'rating' => 1, 'text' => 'Not good.', 'date' => '2024-05-22'],
-            ['author' => 'Susan Davis', 'rating' => 5, 'text' => 'Amazing!', 'date' => '2024-05-17'],
-            ['author' => 'Michael Miller', 'rating' => 4, 'text' => 'Great place.', 'date' => '2024-05-23'],
-            ['author' => 'Linda Wilson', 'rating' => 5, 'text' => 'I love it!', 'date' => '2024-05-16'],
-            ['author' => 'Robert Moore', 'rating' => 3, 'text' => 'It\'s okay.', 'date' => '2024-05-24'],
-            ['author' => 'Patricia Taylor', 'rating' => 4, 'text' => 'I recommend it.', 'date' => '2024-05-15'],
-        ];
+        $reviews = [];
+
+        if ($settings && $settings->yandex_maps_url) {
+            try {
+                $client = new Client();
+                $response = $client->request('GET', $settings->yandex_maps_url);
+                $html = (string) $response->getBody();
+                $document = new Document($html);
+
+                if ($document->has('.business-summary-rating-badge-view__rating')) {
+                    $settings->rating = $document->first('.business-summary-rating-badge-view__rating')->text();
+                }
+
+                if ($document->has('.business-summary-rating-badge-view__reviews-count')) {
+                    $settings->total_reviews = $document->first('.business-summary-rating-badge-view__reviews-count')->text();
+                }
+                $settings->save();
+
+
+                $reviewElements = $document->find('.business-review-view');
+
+                foreach ($reviewElements as $element) {
+                    $author = $element->first('.business-review-view__author-name') ? $element->first('.business-review-view__author-name')->text() : 'N/A';
+                    $text = $element->first('.business-review-view__body-text') ? $element->first('.business-review-view__body-text')->text() : '';
+                    $date = $element->first('.business-review-view__date') ? $element->first('.business-review-view__date')->text() : '';
+
+                    $ratingValue = 'N/A';
+                    $ratingStarsElement = $element->first('span[class*="_nb-rating-stars"]');
+                    if ($ratingStarsElement && $ratingStarsElement->hasAttribute('aria-label')) {
+                        preg_match('/(\d+)/', $ratingStarsElement->getAttribute('aria-label'), $matches);
+                        if ($matches) {
+                            $ratingValue = $matches[0];
+                        }
+                    }
+
+                    $reviews[] = [
+                        'author' => trim($author),
+                        'rating' => trim($ratingValue),
+                        'text'   => trim($text),
+                        'date'   => trim($date),
+                    ];
+                }
+            } catch (\Exception $e) {
+                Log::error('Failed to fetch or parse Yandex reviews: ' . $e->getMessage());
+            }
+        }
 
         $sort = $request->get('sort', 'newest');
 
