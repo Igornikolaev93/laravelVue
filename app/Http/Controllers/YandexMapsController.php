@@ -8,6 +8,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use GuzzleHttp\Client;
 use DiDom\Document;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 
 class YandexMapsController extends Controller
 {
@@ -18,7 +19,10 @@ class YandexMapsController extends Controller
                 'yandex_maps_url' => 'required|url',
             ]);
 
-            // При сохранении нового URL сбрасываем старые данные
+            // Полностью очищаем кеш и старые данные
+            Cache::flush();
+            
+            // Обновляем или создаем запись с новым URL и сброшенными данными
             YandexMapsSetting::updateOrCreate(
                 ['id' => 1],
                 [
@@ -41,22 +45,39 @@ class YandexMapsController extends Controller
 
         if ($settings && $settings->yandex_maps_url) {
             try {
+                // Используем новый клиент с расширенными заголовками
                 $client = new Client([
                     'headers' => [
                         'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                         'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
                         'Accept-Language' => 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+                        'Cache-Control' => 'no-cache, no-store, must-revalidate',
+                        'Pragma' => 'no-cache',
+                        'Expires' => '0',
                     ],
                     'timeout' => 30,
-                    'verify' => false
+                    'verify' => false,
+                    'allow_redirects' => true,
+                    'cookies' => true,
                 ]);
                 
-                $response = $client->request('GET', $settings->yandex_maps_url, ['http_errors' => false]);
+                // Добавляем параметр для обхода кеша
+                $url = $settings->yandex_maps_url . (strpos($settings->yandex_maps_url, '?') === false ? '?' : '&') . '_=' . time();
+                
+                $response = $client->request('GET', $url, ['http_errors' => false]);
                 $html = (string) $response->getBody();
+                
+                // Сохраняем HTML для отладки
+                if (config('app.debug')) {
+                    file_put_contents(storage_path('logs/yandex_debug_' . date('Y-m-d_H-i-s') . '.html'), $html);
+                }
+                
                 $document = new Document($html);
                 
+                // Принудительно обновляем рейтинг и количество
                 $this->updateRatingAndReviewsCount($document, $settings);
                 
+                // Ищем отзывы в JSON-LD
                 $jsonScripts = $document->find('script[type="application/ld+json"]');
                 foreach ($jsonScripts as $script) {
                     $jsonContent = json_decode($script->text(), true);
@@ -69,17 +90,24 @@ class YandexMapsController extends Controller
                     }
                 }
 
+                // Если не нашли в JSON, ищем в HTML
                 if (empty($reviews)) {
                     $reviewElements = $this->findReviews($document);
                     if (!empty($reviewElements)) {
                         foreach ($reviewElements as $element) {
                             $review = $this->parseReview($element);
-                            if (!empty($review['text']) || !empty($review['author'])) {
+                            if (!empty($review['text']) && strlen($review['text']) > 20) {
                                 $reviews[] = $review;
                             }
                         }
                     }
                 }
+                
+                // Если все еще нет отзывов, но есть рейтинг - показываем сообщение
+                if (empty($reviews) && $settings->rating) {
+                    Log::info('No reviews found, but rating exists: ' . $settings->rating);
+                }
+                
             } catch (\Exception $e) {
                 Log::error('Failed to parse Yandex reviews: ' . $e->getMessage());
                 return back()->with('error', 'Failed to fetch reviews. Please check the URL.');
@@ -88,7 +116,12 @@ class YandexMapsController extends Controller
 
         $sort = $request->get('sort', 'newest');
         if (!empty($reviews)) {
-            usort($reviews, fn($a, $b) => ($sort === 'newest') ? strcmp($b['date'], $a['date']) : strcmp($a['date'], $b['date']));
+            usort($reviews, function($a, $b) use ($sort) {
+                if ($sort === 'newest') {
+                    return strtotime($b['date']) - strtotime($a['date']);
+                }
+                return strtotime($a['date']) - strtotime($b['date']);
+            });
         }
 
         $perPage = 5;
@@ -111,35 +144,29 @@ class YandexMapsController extends Controller
     private function updateRatingAndReviewsCount($document, $settings)
     {
         try {
-            // Поиск рейтинга в JSON-LD
+            // Поиск в JSON-LD
             $jsonScripts = $document->find('script[type="application/ld+json"]');
             foreach ($jsonScripts as $script) {
                 $jsonContent = json_decode($script->text(), true);
                 if (json_last_error() === JSON_ERROR_NONE) {
                     if (isset($jsonContent['aggregateRating'])) {
-                        $settings->rating = $jsonContent['aggregateRating']['ratingValue'] ?? null;
-                        $settings->total_reviews = $jsonContent['aggregateRating']['reviewCount'] ?? null;
+                        $settings->rating = $jsonContent['aggregateRating']['ratingValue'] ?? $settings->rating;
+                        $settings->total_reviews = $jsonContent['aggregateRating']['reviewCount'] ?? $settings->total_reviews;
                         $settings->save();
                         return;
                     }
                 }
             }
 
-            // Поиск рейтинга в HTML структуре
-            $ratingElement = $document->first('[class*="rating"] [class*="value"]');
-            if ($ratingElement) {
-                $ratingText = $ratingElement->text();
-                if (preg_match('/(\d+[,.]?\d*)/', $ratingText, $matches)) {
-                    $settings->rating = str_replace(',', '.', $matches[1]);
-                }
+            // Поиск в meta-тегах
+            $ratingMeta = $document->first('meta[itemprop="ratingValue"]');
+            if ($ratingMeta && $ratingMeta->hasAttribute('content')) {
+                $settings->rating = (float) $ratingMeta->attr('content');
             }
-
-            $reviewsCountElement = $document->first('[class*="reviews-count"], [class*="count"]');
-            if ($reviewsCountElement) {
-                $countText = $reviewsCountElement->text();
-                if (preg_match('/(\d+)/', $countText, $matches)) {
-                    $settings->total_reviews = (int)$matches[1];
-                }
+            
+            $countMeta = $document->first('meta[itemprop="reviewCount"]');
+            if ($countMeta && $countMeta->hasAttribute('content')) {
+                $settings->total_reviews = (int) $countMeta->attr('content');
             }
 
             $settings->save();
@@ -165,7 +192,7 @@ class YandexMapsController extends Controller
                 return $this->parseJsonReviews($data['reviews']);
             }
             
-            foreach ($data as $key => $value) {
+            foreach ($data as $value) {
                 if (is_array($value)) {
                     $result = $this->findReviewsInJson($value, $depth + 1);
                     if (!empty($result)) {
@@ -193,204 +220,132 @@ class YandexMapsController extends Controller
         foreach ($jsonReviews as $review) {
             if (!is_array($review)) continue;
             
-            $parsedReview = [
-                'author' => $this->extractAuthorFromJson($review),
-                'date' => $this->extractDateFromJson($review),
-                'rating' => $this->extractRatingFromJson($review),
-                'text' => $this->extractTextFromJson($review),
-            ];
+            $author = 'Аноним';
+            if (isset($review['author'])) {
+                if (is_string($review['author'])) {
+                    $author = $review['author'];
+                } elseif (is_array($review['author']) && isset($review['author']['name'])) {
+                    $author = $review['author']['name'];
+                }
+            }
             
-            if (!empty($parsedReview['text']) || !empty($parsedReview['author'])) {
-                $reviews[] = $parsedReview;
+            $date = $review['datePublished'] ?? $review['dateCreated'] ?? date('Y-m-d');
+            
+            $rating = null;
+            if (isset($review['reviewRating'])) {
+                if (is_array($review['reviewRating']) && isset($review['reviewRating']['ratingValue'])) {
+                    $rating = (float) $review['reviewRating']['ratingValue'];
+                }
+            }
+            
+            $text = $review['reviewBody'] ?? $review['description'] ?? $review['text'] ?? '';
+            
+            if (!empty($text) || $author !== 'Аноним') {
+                $reviews[] = [
+                    'author' => $author,
+                    'date' => $date,
+                    'rating' => $rating,
+                    'text' => $text,
+                ];
             }
         }
         
         return $reviews;
     }
-
-    private function extractAuthorFromJson($review)
-    {
-        if (isset($review['author'])) {
-            if (is_string($review['author'])) {
-                return $review['author'];
-            } elseif (is_array($review['author']) && isset($review['author']['name'])) {
-                return $review['author']['name'];
-            }
-        }
-        return 'Аноним';
-    }
-
-    private function extractDateFromJson($review)
-    {
-        if (isset($review['datePublished'])) {
-            return $review['datePublished'];
-        }
-        if (isset($review['dateCreated'])) {
-            return $review['dateCreated'];
-        }
-        return date('Y-m-d');
-    }
-
-    private function extractRatingFromJson($review)
-    {
-        if (isset($review['reviewRating'])) {
-            if (is_array($review['reviewRating'])) {
-                if (isset($review['reviewRating']['ratingValue'])) {
-                    return $review['reviewRating']['ratingValue'];
-                }
-            }
-        }
-        return null;
-    }
-
-    private function extractTextFromJson($review)
-    {
-        if (isset($review['reviewBody'])) {
-            return $review['reviewBody'];
-        }
-        if (isset($review['description'])) {
-            return $review['description'];
-        }
-        if (isset($review['text'])) {
-            return $review['text'];
-        }
-        return '';
-    }
     
     private function findReviews($document)
     {
-        $reviews = [];
-        
         $selectors = [
-            '[class*="review"]',
-            '[class*="Review"]',
-            '[class*="feedback"]',
-            '[class*="comment"]',
-            '[data-testid*="review"]',
-            'article',
-            '.business-review',
-            '.reviews-list .review-item'
+            'div[class*="review"][class*="item"]',
+            'div[data-testid="review"]',
+            'div[class*="business-review"]',
+            'li[class*="review"]',
+            'article[class*="review"]',
         ];
         
         foreach ($selectors as $selector) {
             $elements = $document->find($selector);
-            if (count($elements) > 3) {
-                return $elements;
-            }
             if (!empty($elements)) {
-                $reviews = array_merge($reviews, $elements);
+                return $elements;
             }
         }
         
-        return array_unique($reviews);
+        return [];
     }
     
     private function parseReview($element)
     {
-        $review = [
-            'author' => 'Аноним',
-            'date' => date('Y-m-d'),
-            'rating' => null,
-            'text' => ''
-        ];
-        
         try {
-            $authorSelectors = [
-                '[class*="author"]',
-                '[class*="name"]',
-                '[class*="user"]',
-                'strong',
-                'b',
-                '[itemprop="author"]'
-            ];
+            // Ищем текст
+            $text = '';
+            $textSelectors = ['p', 'div[class*="text"]', 'div[class*="content"]', 'span[class*="text"]'];
+            foreach ($textSelectors as $selector) {
+                $textEl = $element->first($selector);
+                if ($textEl) {
+                    $text = trim($textEl->text());
+                    if (strlen($text) > 20) break;
+                }
+            }
             
+            if (strlen($text) < 20) return null;
+            
+            // Ищем автора
+            $author = 'Аноним';
+            $authorSelectors = ['strong', 'b', 'span[class*="author"]', 'div[class*="author"]', 'span[class*="name"]'];
             foreach ($authorSelectors as $selector) {
-                $authorElement = $element->first($selector);
-                if ($authorElement) {
-                    $authorText = trim($authorElement->text());
-                    if (!empty($authorText) && strlen($authorText) < 50) {
-                        $review['author'] = $authorText;
+                $authorEl = $element->first($selector);
+                if ($authorEl) {
+                    $authorText = trim($authorEl->text());
+                    if (!empty($authorText) && strlen($authorText) < 50 && !preg_match('/^(написать|оставить)/iu', $authorText)) {
+                        $author = $authorText;
                         break;
                     }
                 }
             }
             
-            $dateSelectors = [
-                '[class*="date"]',
-                '[class*="time"]',
-                '[datetime]',
-                '[itemprop="datePublished"]',
-                'time'
-            ];
-            
+            // Ищем дату
+            $date = date('Y-m-d');
+            $dateSelectors = ['time', 'span[class*="date"]', 'div[class*="date"]', '[datetime]'];
             foreach ($dateSelectors as $selector) {
-                $dateElement = $element->first($selector);
-                if ($dateElement) {
-                    if ($dateElement->hasAttribute('datetime')) {
-                        $dateText = $dateElement->attr('datetime');
-                    } else {
-                        $dateText = $dateElement->text();
-                    }
-                    
+                $dateEl = $element->first($selector);
+                if ($dateEl) {
+                    $dateText = $dateEl->attr('datetime') ?? $dateEl->text();
                     $timestamp = strtotime($dateText);
-                    if ($timestamp !== false) {
-                        $review['date'] = date('Y-m-d', $timestamp);
+                    if ($timestamp !== false && $timestamp <= time()) {
+                        $date = date('Y-m-d', $timestamp);
                         break;
                     }
                 }
             }
             
-            $ratingSelectors = [
-                '[class*="rating"]',
-                '[class*="stars"]',
-                '[itemprop="ratingValue"]',
-                '[aria-label*="звезд"]',
-                '[aria-label*="star"]'
-            ];
-            
+            // Ищем рейтинг
+            $rating = null;
+            $ratingSelectors = ['div[class*="rating"]', 'span[class*="rating"]', 'meta[itemprop="ratingValue"]'];
             foreach ($ratingSelectors as $selector) {
-                $ratingElement = $element->first($selector);
-                if ($ratingElement) {
-                    $ratingText = $ratingElement->text();
-                    if (preg_match('/(\d+[,.]?\d*)/', $ratingText, $matches)) {
-                        $review['rating'] = (float)str_replace(',', '.', $matches[1]);
-                        break;
-                    }
-                    
-                    if ($ratingElement->hasAttribute('aria-label')) {
-                        $ariaLabel = $ratingElement->attr('aria-label');
-                        if (preg_match('/(\d+[,.]?\d*)/', $ariaLabel, $matches)) {
-                            $review['rating'] = (float)str_replace(',', '.', $matches[1]);
-                            break;
+                $ratingEl = $element->first($selector);
+                if ($ratingEl) {
+                    if ($ratingEl->tag === 'meta' && $ratingEl->hasAttribute('content')) {
+                        $rating = (float) $ratingEl->attr('content');
+                    } else {
+                        $ratingText = $ratingEl->text();
+                        if (preg_match('/(\d+[,.]?\d*)/', $ratingText, $matches)) {
+                            $rating = (float) str_replace(',', '.', $matches[1]);
                         }
                     }
+                    if ($rating && $rating > 0 && $rating <= 5) break;
                 }
             }
             
-            $textSelectors = [
-                '[class*="text"]',
-                '[class*="content"]',
-                '[class*="message"]',
-                '[itemprop="reviewBody"]',
-                '[class*="description"]',
-                'p'
+            return [
+                'author' => $author,
+                'date' => $date,
+                'rating' => $rating,
+                'text' => $text,
             ];
             
-            foreach ($textSelectors as $selector) {
-                $textElement = $element->first($selector);
-                if ($textElement) {
-                    $text = trim($textElement->text());
-                    if (!empty($text) && strlen($text) > 10) {
-                        $review['text'] = $text;
-                        break;
-                    }
-                }
-            }
-            
         } catch (\Exception $e) {
-            Log::error('Error parsing review element: ' . $e->getMessage());
+            Log::error('Error parsing review: ' . $e->getMessage());
+            return null;
         }
-        
-        return $review;
     }
 }
