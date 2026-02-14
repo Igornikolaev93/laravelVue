@@ -8,7 +8,7 @@
     .rating-block { display: flex; align-items: center; gap: 20px; padding: 20px; background: #f6f8fa; border-radius: 6px; margin-bottom: 20px; }
     .stars { color: #ffc107; }
     .review-card { background: white; border: 1px solid #e5e5e5; border-radius: 6px; padding: 20px; margin-bottom: 20px; }
-    .review-header { color: #6c757d; margin-bottom: 10px; display: flex; gap: 10px; align-items: center; }
+    .review-header { color: #6c757d; margin-bottom: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     .alert { padding: 15px; margin-bottom: 20px; border-radius: 4px; }
     .alert-danger { background: #f8d7da; color: #721c24; }
     .alert-success { background: #d4edda; color: #155724; }
@@ -33,8 +33,14 @@
         @if(isset($paginated) && $paginated->count() > 0)
             <div class="rating-block">
                 <span class="platform-name">Яндекс Карты</span>
-                <span class="rating-value">{{ $settings->rating ?? 'N/A' }}</span>
-                <div class="stars">{{ str_repeat('★', round($settings->rating ?? 0)) . str_repeat('☆', 5 - round($settings->rating ?? 0)) }}</div>
+                <span class="rating-value">
+                    {{ is_numeric($settings->rating) ? number_format($settings->rating, 1) : 'N/A' }}
+                </span>
+                @php
+                    $ratingValue = is_numeric($settings->rating) ? round((float)$settings->rating) : 0;
+                    $ratingValue = max(0, min(5, $ratingValue)); // Ограничиваем от 0 до 5
+                @endphp
+                <div class="stars">{{ str_repeat('★', $ratingValue) . str_repeat('☆', 5 - $ratingValue) }}</div>
                 <span>{{ $settings->total_reviews ?? 0 }} отзывов</span>
             </div>
 
@@ -43,8 +49,12 @@
                     <div class="review-header">
                         <span>{{ $review['author'] }}</span>
                         <span>{{ $review['date'] }}</span>
-                        @if($review['rating'])
-                            <div class="stars">{{ str_repeat('★', round($review['rating'])) . str_repeat('☆', 5 - round($review['rating'])) }}</div>
+                        @if(!empty($review['rating']) && is_numeric($review['rating']))
+                            @php
+                                $reviewRating = round((float)$review['rating']);
+                                $reviewRating = max(0, min(5, $reviewRating));
+                            @endphp
+                            <div class="stars">{{ str_repeat('★', $reviewRating) . str_repeat('☆', 5 - $reviewRating) }}</div>
                         @endif
                     </div>
                     <div>{{ $review['text'] }}</div>
