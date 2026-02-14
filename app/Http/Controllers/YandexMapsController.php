@@ -26,22 +26,64 @@ class YandexMapsController extends Controller
 
         $reviews = [];
         try {
-            // Извлекаем ID организации из URL
-            $orgId = $this->extractOrgId($settings->yandex_maps_url);
+            // Получаем HTML страницы
+            $client = new Client([
+                'headers' => [
+                    'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Accept-Language' => 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+                ],
+                'timeout' => 30,
+                'verify' => false
+            ]);
             
-            if ($orgId) {
-                // Пробуем получить отзывы через API Яндекс Карт
-                $reviews = $this->fetchReviewsFromApi($orgId);
+            $response = $client->get($settings->yandex_maps_url);
+            $html = (string) $response->getBody();
+            
+            // Сохраняем HTML для отладки
+            Log::info('HTML length: ' . strlen($html));
+            
+            // Ищем JSON данные в HTML
+            preg_match_all('/<script[^>]*type="application\/ld\+json"[^>]*>(.*?)<\/script>/s', $html, $matches);
+            
+            foreach ($matches[1] as $jsonContent) {
+                $data = json_decode($jsonContent, true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    // Ищем отзывы в JSON
+                    $foundReviews = $this->extractReviewsFromJson($data);
+                    if (!empty($foundReviews)) {
+                        $reviews = array_merge($reviews, $foundReviews);
+                    }
+                }
             }
             
-            // Если API не сработал, пробуем парсинг HTML
+            // Если не нашли в JSON, ищем в HTML структуре
             if (empty($reviews)) {
-                $reviews = $this->parseHtmlReviews($settings->yandex_maps_url);
+                $document = new Document($html);
+                
+                // Ищем блоки с отзывами
+                $reviewBlocks = $document->find('div[class*="review"], div[class*="Review"], div[data-testid*="review"]');
+                
+                foreach ($reviewBlocks as $block) {
+                    $review = $this->extractReviewFromBlock($block);
+                    if ($review && !empty($review['text']) && strlen($review['text']) > 10) {
+                        $reviews[] = $review;
+                    }
+                }
             }
             
-            // Обновляем рейтинг и количество отзывов
+            // Обновляем информацию о рейтинге
             if (!empty($reviews)) {
-                $this->updateSettingsFromReviews($settings, $reviews);
+                $settings->total_reviews = count($reviews);
+                
+                // Вычисляем средний рейтинг
+                $ratings = array_column($reviews, 'rating');
+                $ratings = array_filter($ratings, fn($r) => is_numeric($r) && $r > 0);
+                if (!empty($ratings)) {
+                    $settings->rating = round(array_sum($ratings) / count($ratings), 1);
+                }
+                
+                $settings->save();
             }
             
         } catch (\Exception $e) {
@@ -69,237 +111,47 @@ class YandexMapsController extends Controller
     }
     
     /**
-     * Извлечение ID организации из URL Яндекс Карт
+     * Извлечение отзывов из JSON
      */
-    private function extractOrgId($url)
+    private function extractReviewsFromJson($data, $depth = 0)
     {
-        // Паттерны для разных форматов URL Яндекс Карт
-        $patterns = [
-            '/org\/([^\/]+)/',
-            '/oid=(\d+)/',
-            '/business\/(\d+)/',
-            '/profile\/(\d+)/'
-        ];
-        
-        foreach ($patterns as $pattern) {
-            if (preg_match($pattern, $url, $matches)) {
-                return $matches[1];
-            }
+        if ($depth > 10 || !is_array($data)) {
+            return [];
         }
-        
-        return null;
-    }
-    
-    /**
-     * Получение отзывов через API Яндекс Карт
-     */
-    private function fetchReviewsFromApi($orgId)
-    {
-        $reviews = [];
-        
-        try {
-            // Пробуем разные эндпоинты API
-            $endpoints = [
-                "https://yandex.ru/maps/api/org/{$orgId}/reviews",
-                "https://yandex.ru/maps/api/business/{$orgId}/reviews",
-                "https://yandex.ru/maps/api/profile/{$orgId}/reviews"
-            ];
-            
-            $client = new Client(['timeout' => 10, 'verify' => false]);
-            
-            foreach ($endpoints as $endpoint) {
-                try {
-                    $response = $client->get($endpoint, [
-                        'headers' => [
-                            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                            'Accept' => 'application/json',
-                            'X-Requested-With' => 'XMLHttpRequest'
-                        ],
-                        'query' => [
-                            'lang' => 'ru',
-                            'limit' => 50
-                        ]
-                    ]);
-                    
-                    $data = json_decode($response->getBody(), true);
-                    
-                    if (isset($data['reviews']) && is_array($data['reviews'])) {
-                        foreach ($data['reviews'] as $review) {
-                            $parsedReview = $this->parseApiReview($review);
-                            if ($this->isValidReview($parsedReview)) {
-                                $reviews[] = $parsedReview;
-                            }
-                        }
-                        break;
-                    }
-                } catch (\Exception $e) {
-                    continue;
-                }
-            }
-            
-        } catch (\Exception $e) {
-            Log::error('API fetch failed: ' . $e->getMessage());
-        }
-        
-        return $reviews;
-    }
-    
-    /**
-     * Парсинг HTML страницы
-     */
-    private function parseHtmlReviews($url)
-    {
-        $reviews = [];
-        
-        try {
-            $client = new Client([
-                'headers' => [
-                    'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                    'Accept-Language' => 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
-                ],
-                'timeout' => 30,
-                'verify' => false
-            ]);
-            
-            $response = $client->get($url);
-            $html = (string) $response->getBody();
-            $document = new Document($html);
-            
-            // Поиск в JSON-LD
-            foreach ($document->find('script[type="application/ld+json"]') as $script) {
-                $json = json_decode($script->text(), true);
-                if ($json) {
-                    $jsonReviews = $this->findReviewsInJson($json);
-                    if (!empty($jsonReviews)) {
-                        foreach ($jsonReviews as $review) {
-                            if ($this->isValidReview($review)) {
-                                $reviews[] = $review;
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // Если не нашли в JSON, ищем в HTML
-            if (empty($reviews)) {
-                // Более специфичные селекторы для Яндекс Карт
-                $selectors = [
-                    'div[class*="review"][class*="item"]',
-                    'div[data-testid="review"]',
-                    'div[class*="business-review"]',
-                    'li[class*="review"]',
-                    'div[class*="feedback-item"]'
-                ];
-                
-                foreach ($selectors as $selector) {
-                    $elements = $document->find($selector);
-                    foreach ($elements as $element) {
-                        $review = $this->parseReviewElement($element);
-                        if ($this->isValidReview($review)) {
-                            $reviews[] = $review;
-                        }
-                    }
-                    if (!empty($reviews)) break;
-                }
-            }
-            
-        } catch (\Exception $e) {
-            Log::error('HTML parse failed: ' . $e->getMessage());
-        }
-        
-        return $reviews;
-    }
-    
-    /**
-     * Проверка, является ли отзыв валидным
-     */
-    private function isValidReview($review)
-    {
-        // Проверяем, что это не призыв оставить отзыв
-        $spamPhrases = [
-            'оцените',
-            'напишите отзыв',
-            'ваше мнение',
-            'поделитесь впечатлениями',
-            'оставьте отзыв',
-            'как вам',
-            'оценить',
-            'написать отзыв'
-        ];
-        
-        $text = mb_strtolower($review['text'] ?? '');
-        foreach ($spamPhrases as $phrase) {
-            if (mb_strpos($text, $phrase) !== false) {
-                return false;
-            }
-        }
-        
-        // Проверяем длину текста (минимум 10 символов)
-        if (strlen(trim($text)) < 10) {
-            return false;
-        }
-        
-        // Проверяем, что автор не "Аноним" или что есть текст
-        if ($review['author'] === 'Аноним' && empty($text)) {
-            return false;
-        }
-        
-        // Проверяем, что дата не сегодняшняя (если это призыв оставить отзыв)
-        if ($review['date'] === date('Y-m-d') && empty($review['rating'])) {
-            return false;
-        }
-        
-        return true;
-    }
-    
-    /**
-     * Поиск отзывов в JSON
-     */
-    private function findReviewsInJson($data, $depth = 0)
-    {
-        if ($depth > 10 || !is_array($data)) return [];
         
         $reviews = [];
         
         // Проверяем, является ли текущий элемент отзывом
         if (isset($data['@type']) && $data['@type'] === 'Review' && isset($data['reviewBody'])) {
-            $review = $this->parseJsonReview($data);
-            if ($this->isValidReview($review)) {
+            $review = [
+                'author' => $this->getJsonValue($data, 'author'),
+                'date' => $this->formatDate($this->getJsonValue($data, 'datePublished') ?? $this->getJsonValue($data, 'dateCreated')),
+                'rating' => $this->extractRatingFromJson($data),
+                'text' => $data['reviewBody'] ?? '',
+            ];
+            
+            if (!empty($review['text']) && strlen($review['text']) > 10) {
                 $reviews[] = $review;
             }
         }
         
-        // Проверяем наличие массива отзывов
+        // Ищем вложенные отзывы
         if (isset($data['review']) && is_array($data['review'])) {
-            foreach ((array) $data['review'] as $r) {
-                if (is_array($r)) {
-                    $review = $this->parseJsonReview($r);
-                    if ($this->isValidReview($review)) {
-                        $reviews[] = $review;
-                    }
-                }
+            foreach ($data['review'] as $item) {
+                $reviews = array_merge($reviews, $this->extractReviewsFromJson($item, $depth + 1));
             }
         }
         
         if (isset($data['reviews']) && is_array($data['reviews'])) {
-            foreach ($data['reviews'] as $r) {
-                if (is_array($r)) {
-                    $review = $this->parseJsonReview($r);
-                    if ($this->isValidReview($review)) {
-                        $reviews[] = $review;
-                    }
-                }
+            foreach ($data['reviews'] as $item) {
+                $reviews = array_merge($reviews, $this->extractReviewsFromJson($item, $depth + 1));
             }
         }
         
-        // Рекурсивный поиск
-        foreach ($data as $value) {
-            if (is_array($value)) {
-                $found = $this->findReviewsInJson($value, $depth + 1);
-                if (!empty($found)) {
-                    $reviews = array_merge($reviews, $found);
-                }
+        // Рекурсивный обход
+        foreach ($data as $key => $value) {
+            if (is_array($value) && !in_array($key, ['review', 'reviews'])) {
+                $reviews = array_merge($reviews, $this->extractReviewsFromJson($value, $depth + 1));
             }
         }
         
@@ -307,54 +159,72 @@ class YandexMapsController extends Controller
     }
     
     /**
-     * Парсинг отзыва из JSON
+     * Извлечение значения из JSON
      */
-    private function parseJsonReview($review)
+    private function getJsonValue($data, $key)
     {
-        return [
-            'author' => $this->extractAuthorFromJson($review),
-            'date' => $this->extractDateFromJson($review),
-            'rating' => $this->extractRatingFromJson($review),
-            'text' => $this->extractTextFromJson($review)
-        ];
+        if (!isset($data[$key])) {
+            return null;
+        }
+        
+        if (is_array($data[$key])) {
+            return $data[$key]['name'] ?? $data[$key][0] ?? null;
+        }
+        
+        return $data[$key];
     }
     
     /**
-     * Парсинг элемента отзыва из HTML
+     * Извлечение рейтинга из JSON
      */
-    private function parseReviewElement($element)
+    private function extractRatingFromJson($data)
     {
-        $text = '';
-        $author = 'Аноним';
-        $date = date('Y-m-d');
-        $rating = null;
-        
+        if (isset($data['reviewRating'])) {
+            if (is_array($data['reviewRating'])) {
+                return $data['reviewRating']['ratingValue'] ?? null;
+            }
+            return $data['reviewRating'];
+        }
+        return null;
+    }
+    
+    /**
+     * Извлечение отзыва из HTML блока
+     */
+    private function extractReviewFromBlock($block)
+    {
         try {
-            // Поиск текста (исключаем кнопки и формы)
-            $textElements = $element->find('[class*="text"]:not(button):not(input), [class*="content"]:not(button):not(input), p:not(button):not(input)');
+            $text = '';
+            $author = 'Аноним';
+            $date = date('Y-m-d');
+            $rating = null;
+            
+            // Ищем текст отзыва
+            $textElements = $block->find('p, div[class*="text"], div[class*="content"], span[class*="text"]');
             foreach ($textElements as $el) {
                 $potentialText = trim($el->text());
-                // Пропускаем если это кнопка или призыв к действию
-                if (strlen($potentialText) > 10 && !preg_match('/^(оцените|напишите|показать|ещё|читать)/iu', $potentialText)) {
+                if (strlen($potentialText) > 20 && !preg_match('/^(оцените|напишите|показать|ещё|читать)/iu', $potentialText)) {
                     $text = $potentialText;
                     break;
                 }
             }
             
-            if (empty($text)) return null;
+            if (empty($text)) {
+                return null;
+            }
             
-            // Поиск автора
-            $authorElements = $element->find('[class*="author"]:not(button), [class*="name"]:not(button), [itemprop="author"]:not(button), strong:not(button)');
+            // Ищем автора
+            $authorElements = $block->find('strong, b, div[class*="author"], span[class*="author"], div[class*="name"]');
             foreach ($authorElements as $el) {
                 $authorText = trim($el->text());
-                if (!empty($authorText) && strlen($authorText) < 50 && !preg_match('/^(оцените|напишите)/iu', $authorText)) {
+                if (!empty($authorText) && strlen($authorText) < 30 && !preg_match('/^(оцените|напишите)/iu', $authorText)) {
                     $author = $authorText;
                     break;
                 }
             }
             
-            // Поиск даты
-            $dateElements = $element->find('[class*="date"]:not(button), [datetime]:not(button), time:not(button), [itemprop="datePublished"]:not(button)');
+            // Ищем дату
+            $dateElements = $block->find('time, span[class*="date"], div[class*="date"], [datetime]');
             foreach ($dateElements as $el) {
                 $dateText = $el->attr('datetime') ?? $el->text();
                 $dateText = preg_replace('/[^0-9.\-\s]/u', '', $dateText);
@@ -364,8 +234,8 @@ class YandexMapsController extends Controller
                 }
             }
             
-            // Поиск рейтинга
-            $ratingElements = $element->find('[class*="rating"]:not(button):not(input), [class*="stars"]:not(button):not(input), [itemprop="ratingValue"]:not(button):not(input)');
+            // Ищем рейтинг
+            $ratingElements = $block->find('div[class*="rating"], span[class*="rating"], div[class*="stars"], span[class*="stars"]');
             foreach ($ratingElements as $el) {
                 $ratingText = $el->text();
                 if (preg_match('/(\d+[,.]?\d*)/', $ratingText, $matches)) {
@@ -376,100 +246,29 @@ class YandexMapsController extends Controller
                 }
             }
             
+            return [
+                'author' => $author,
+                'date' => $date,
+                'rating' => $rating,
+                'text' => $text,
+            ];
+            
         } catch (\Exception $e) {
-            Log::error('Parse element error: ' . $e->getMessage());
+            Log::error('Error extracting review: ' . $e->getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * Форматирование даты
+     */
+    private function formatDate($date)
+    {
+        if (!$date) {
+            return date('Y-m-d');
         }
         
-        return [
-            'author' => $author,
-            'date' => $date,
-            'rating' => $rating,
-            'text' => $text
-        ];
-    }
-    
-    private function extractAuthorFromJson($review)
-    {
-        if (isset($review['author'])) {
-            if (is_array($review['author'])) {
-                return $review['author']['name'] ?? 'Аноним';
-            }
-            return $review['author'];
-        }
-        return 'Аноним';
-    }
-    
-    private function extractDateFromJson($review)
-    {
-        $date = $review['datePublished'] ?? $review['dateCreated'] ?? $review['date'] ?? null;
-        if ($date && $timestamp = strtotime($date)) {
-            return date('Y-m-d', $timestamp);
-        }
-        return date('Y-m-d');
-    }
-    
-    private function extractRatingFromJson($review)
-    {
-        if (isset($review['reviewRating'])) {
-            if (is_array($review['reviewRating'])) {
-                return $review['reviewRating']['ratingValue'] ?? null;
-            }
-            return $review['reviewRating'];
-        }
-        return null;
-    }
-    
-    private function extractTextFromJson($review)
-    {
-        return $review['reviewBody'] ?? $review['description'] ?? $review['text'] ?? '';
-    }
-    
-    private function parseApiReview($review)
-    {
-        return [
-            'author' => $this->getAuthorFromApi($review),
-            'date' => $this->getDateFromApi($review),
-            'rating' => $this->getRatingFromApi($review),
-            'text' => $this->getTextFromApi($review)
-        ];
-    }
-    
-    private function getAuthorFromApi($review)
-    {
-        return $review['user']['name'] 
-            ?? $review['author'] 
-            ?? $review['userName'] 
-            ?? 'Аноним';
-    }
-    
-    private function getDateFromApi($review)
-    {
-        $date = $review['date'] ?? $review['createdAt'] ?? $review['datePublished'] ?? 'now';
-        return date('Y-m-d', strtotime($date));
-    }
-    
-    private function getRatingFromApi($review)
-    {
-        $rating = $review['rating'] ?? $review['stars'] ?? $review['score'] ?? null;
-        return $rating ? (float) $rating : null;
-    }
-    
-    private function getTextFromApi($review)
-    {
-        return $review['text'] ?? $review['content'] ?? $review['comment'] ?? $review['reviewText'] ?? '';
-    }
-    
-    private function updateSettingsFromReviews($settings, $reviews)
-    {
-        // Вычисляем средний рейтинг
-        $ratings = array_column($reviews, 'rating');
-        $ratings = array_filter($ratings, fn($r) => is_numeric($r) && $r > 0 && $r <= 5);
-        
-        if (!empty($ratings)) {
-            $settings->rating = round(array_sum($ratings) / count($ratings), 1);
-        }
-        
-        $settings->total_reviews = count($reviews);
-        $settings->save();
+        $timestamp = is_numeric($date) ? $date : strtotime($date);
+        return $timestamp ? date('Y-m-d', $timestamp) : date('Y-m-d');
     }
 }
