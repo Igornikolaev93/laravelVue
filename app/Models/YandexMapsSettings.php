@@ -11,5 +11,10 @@ class YandexMapsSettings extends Model
 
     protected $fillable = [
         'yandex_maps_url',
+        'rating',
+        'total_reviews'
     ];
+    
+    // Если нужно, укажите таблицу явно
+    protected $table = 'yandex_maps_settings';
 }
