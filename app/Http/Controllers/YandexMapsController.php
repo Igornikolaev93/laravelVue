@@ -1,1 +1,164 @@
-<?php\n\nnamespace App\\Http\\Controllers;\n\nuse App\\Models\\YandexMapsSetting;\nuse Illuminate\\Http\\Request;\nuse Illuminate\\Pagination\\LengthAwarePaginator;\nuse GuzzleHttp\\Client;\nuse Illuminate\\Support\\Facades\\Log;\n\nclass YandexMapsController extends Controller\n{\n    public function index(Request $request)\n    {\n        if ($request->isMethod(\'post\')) {\n            $validated = $request->validate([\'yandex_maps_url\' => \'required|url\']);\n            YandexMapsSetting::updateOrCreate([\'id\' => 1], [\'yandex_maps_url\' => $validated[\'yandex_maps_url\']]);\n            return redirect()->route(\'yandex-maps.index\')->with(\'success\', \'URL saved. Fetching reviews...\');\n        }\n\n        $settings = YandexMapsSetting::first();\n        if (!$settings || !$settings->yandex_maps_url) {\n            return view(\'yandex-maps.connect\');\n        }\n\n        $reviews = [];\n        \n        try {\n            // Получаем HTML страницы\n            $client = new Client([\n                \'headers\' => [\n                    \'User-Agent\' => \'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\',\n                    \'Accept\' => \'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8\',\n                    \'Accept-Language\' => \'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7\',\n                ],\n                \'timeout\' => 30,\n                \'verify\' => false\n            ]);\n            \n            $response = $client->get($settings->yandex_maps_url);\n            $html = (string) $response->getBody();\n            \n            // Ищем JSON данные в script тегах\n            preg_match_all(\'/<script[^>]*>(.*?)<\\/script>/is\', $html, $scriptMatches);\n            \n            foreach ($scriptMatches[1] as $scriptContent) {\n                // Ищем объекты с отзывами\n                if (strpos($scriptContent, \'reviews\') !== false || strpos($scriptContent, \'отзыв\') !== false) {\n                    \n                    // Ищем JSON объекты\n                    if (preg_match(\'/\\{.*\"reviews\".*\\}/s\', $scriptContent, $jsonMatches)) {\n                        $potentialJson = $jsonMatches[0];\n                        \n                        // Очищаем JSON от JavaScript кода\n                        $potentialJson = preg_replace(\'/^[^{]*/\', \'\', $potentialJson);\n                        $potentialJson = preg_replace(\'/[^}]*$/\', \'\', $potentialJson);\n                        \n                        $data = json_decode($potentialJson, true);\n                        if (json_last_error() === JSON_ERROR_NONE) {\n                            $extracted = $this->extractDataFromJson($data);\n                            if (!empty($extracted[\'reviews\'])) {\n                                $reviews = $extracted[\'reviews\'];\n                                break;\n                            }\n                        }\n                    }\n                    \n                    // Ищем данные в формате window.__INITIAL_STATE__\n                    if (preg_match(\'/window\\.__INITIAL_STATE__\\s*=\\s*(\\{.*?\\});/s\', $scriptContent, $stateMatches)) {\n                        $stateJson = $stateMatches[1];\n                        $stateData = json_decode($stateJson, true);\n                        if (json_last_error() === JSON_ERROR_NONE) {\n                            $extracted = $this->extractFromInitialState($stateData);\n                            if (!empty($extracted[\'reviews\'])) {\n                                $reviews = $extracted[\'reviews\'];\n                                break;\n                            }\n                        }\n                    }\n                }\n            }\n            \n            // Если не нашли в скриптах, пробуем найти в meta тегах\n            if (empty($reviews)) {\n                preg_match(\'/<meta[^>]*itemprop=\"ratingValue\"[^>]*content=\"([^"]*)\"\/i\', $html, $ratingMatch);\n                if (isset($ratingMatch[1])) {\n                    $settings->rating = (float) $ratingMatch[1];\n                }\n                \n                preg_match(\'/<meta[^>]*itemprop=\"reviewCount\"[^>]*content=\"([^"]*)\"\/i\', $html, $countMatch);\n                if (isset($countMatch[1])) {\n                    $settings->total_reviews = (int) $countMatch[1];\n                }\n                \n                $settings->save();\n            }\n            \n        } catch (\\Exception $e) {\n            Log::error(\'Failed to fetch Yandex reviews: \' . $e->getMessage());\n            return back()->with(\'error\', \'Failed to fetch reviews. Please check the URL.\');\n        }\n\n        // Сортировка\n        $sort = $request->get(\'sort\', \'newest\');\n        if ($reviews) {\n            usort($reviews, fn($a, $b) => $sort === \'newest\' \n                ? strtotime($b[\'date\'] ?? \'1970-01-01\') - strtotime($a[\'date\'] ?? \'1970-01-01\')\n                : strtotime($a[\'date\'] ?? \'1970-01-01\') - strtotime($b[\'date\'] ?? \'1970-01-01\'));\n        }\n\n        // Пагинация\n        $page = $request->get(\'page\', 1);\n        $perPage = 5;\n        $paginated = new LengthAwarePaginator(\n            array_slice($reviews, ($page - 1) * $perPage, $perPage),\n            count($reviews), $perPage, $page, [\'path\' => $request->url(), \'query\' => $request->query()]\n        );\n\n        return view(\'yandex-maps.index\', compact(\'settings\', \'paginated\', \'sort\'));\n    }\n    \n    /**\n     * Извлечение данных из JSON\n     */\n    private function extractDataFromJson($data, $depth = 0)\n    {\n        if ($depth > 10 || !is_array($data)) {\n            return [\'reviews\' => []];\n        }\n        \n        $result = [\'reviews\' => []];\n        \n        // Ищем отзывы\n        if (isset($data[\'reviews\']) && is_array($data[\'reviews\'])) {\n            foreach ($data[\'reviews\'] as $review) {\n                if (is_array($review) && isset($review[\'text\'])) {\n                    $result[\'reviews\'][] = [\n                        \'author\' => $review[\'author\'][\'name\'] ?? $review[\'user\'][\'name\'] ?? $review[\'author\'] ?? \'Аноним\',\n                        \'date\' => $this->formatDate($review[\'date\'] ?? $review[\'created\'] ?? $review[\'datePublished\'] ?? null),\n                        \'rating\' => $review[\'rating\'] ?? $review[\'stars\'] ?? null,\n                        \'text\' => $review[\'text\'] ?? $review[\'content\'] ?? $review[\'reviewBody\'] ?? \'\',\n                    ];\n                }\n            }\n        }\n        \n        // Рекурсивный поиск\n        foreach ($data as $key => $value) {\n            if (is_array($value) && $key !== \'reviews\') {\n                $found = $this->extractDataFromJson($value, $depth + 1);\n                if (!empty($found[\'reviews\'])) {\n                    $result[\'reviews\'] = array_merge($result[\'reviews\'], $found[\'reviews\']);\n                }\n            }\n        }\n        \n        return $result;\n    }\n    \n    /**\n     * Извлечение из INITIAL_STATE\n     */\n    private function extractFromInitialState($data)\n    {\n        $result = [\'reviews\' => []];\n        \n        if (!is_array($data)) {\n            return $result;\n        }\n        \n        // Типичная структура INITIAL_STATE в Яндекс Картах\n        if (isset($data[\'reviews\']) && isset($data[\'reviews\'][\'items\']) && is_array($data[\'reviews\'][\'items\'])) {\n            foreach ($data[\'reviews\'][\'items\'] as $review) {\n                if (is_array($review) && isset($review[\'text\'])) {\n                    $result[\'reviews\'][] = [\n                        \'author\' => $review[\'author\'][\'name\'] ?? $review[\'user\'][\'name\'] ?? \'Аноним\',\n                        \'date\' => $this->formatDate($review[\'date\'] ?? $review[\'createdAt\'] ?? null),\n                        \'rating\' => $review[\'rating\'] ?? $review[\'stars\'] ?? null,\n                        \'text\' => $review[\'text\'] ?? $review[\'content\'] ?? \'\',\n                    ];\n                }\n            }\n        }\n        \n        return $result;\n    }\n    \n    /**\n     * Форматирование даты\n     */\n    private function formatDate($date)\n    {\n        if (!$date) {\n            return date(\'Y-m-d\');\n        }\n        \n        $timestamp = is_numeric($date) ? $date : strtotime($date);\n        return $timestamp ? date(\'Y-m-d\', $timestamp) : date(\'Y-m-d\');\n    }\n}
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\YandexMapsSetting;
+use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
+use GuzzleHttp\Client;
+use Illuminate\Support\Facades\Log;
+
+class YandexMapsController extends Controller
+{
+    public function index(Request $request)
+    {
+        if ($request->isMethod('post')) {
+            $validated = $request->validate(['yandex_maps_url' => 'required|url']);
+            YandexMapsSetting::updateOrCreate(['id' => 1], ['yandex_maps_url' => $validated['yandex_maps_url']]);
+            return redirect()->route('yandex-maps.index')->with('success', 'URL saved. Fetching reviews...');
+        }
+
+        $settings = YandexMapsSetting::first();
+        if (!$settings || !$settings->yandex_maps_url) {
+            return view('yandex-maps.connect');
+        }
+
+        $reviews = [];
+        
+        try {
+            $client = new Client([
+                'headers' => [
+                    'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Accept-Language' => 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+                ],
+                'timeout' => 30,
+                'verify' => false
+            ]);
+            
+            $response = $client->get($settings->yandex_maps_url);
+            $html = (string) $response->getBody();
+            
+            // Поиск данных в скриптах
+            preg_match_all('/<script[^>]*>(.*?)<\/script>/is', $html, $matches);
+            
+            foreach ($matches[1] as $script) {
+                if (strpos($script, 'reviews') === false && strpos($script, 'отзыв') === false) {
+                    continue;
+                }
+                
+                // Поиск JSON
+                if (preg_match('/\{.*"reviews".*\}/s', $script, $jsonMatch)) {
+                    $json = preg_replace(['/^[^{]*/', '/[^}]*$/'], '', $jsonMatch[0]);
+                    $data = json_decode($json, true);
+                    
+                    if (json_last_error() === JSON_ERROR_NONE) {
+                        $reviews = $this->extractReviews($data);
+                        if (!empty($reviews)) break;
+                    }
+                }
+                
+                // Поиск INITIAL_STATE
+                if (preg_match('/window\.__INITIAL_STATE__\s*=\s*(\{.*?\});/s', $script, $stateMatch)) {
+                    $data = json_decode($stateMatch[1], true);
+                    if (json_last_error() === JSON_ERROR_NONE) {
+                        $reviews = $this->extractFromInitialState($data);
+                        if (!empty($reviews)) break;
+                    }
+                }
+            }
+            
+            // Мета-теги
+            if (empty($reviews)) {
+                preg_match('/itemprop="ratingValue"\s+content="([^"]*)"/i', $html, $r);
+                preg_match('/itemprop="reviewCount"\s+content="([^"]*)"/i', $html, $c);
+                
+                $settings->rating = isset($r[1]) ? (float) $r[1] : null;
+                $settings->total_reviews = isset($c[1]) ? (int) $c[1] : 0;
+                $settings->save();
+            }
+            
+        } catch (\Exception $e) {
+            Log::error('Yandex fetch failed: ' . $e->getMessage());
+            return back()->with('error', 'Failed to fetch reviews. Please check the URL.');
+        }
+
+        // Сортировка
+        $sort = $request->get('sort', 'newest');
+        if ($reviews) {
+            usort($reviews, fn($a, $b) => $sort === 'newest' 
+                ? strtotime($b['date']) - strtotime($a['date'])
+                : strtotime($a['date']) - strtotime($b['date']));
+        }
+
+        // Пагинация
+        $page = $request->get('page', 1);
+        $perPage = 5;
+        $paginated = new LengthAwarePaginator(
+            array_slice($reviews, ($page - 1) * $perPage, $perPage),
+            count($reviews), $perPage, $page,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+
+        return view('yandex-maps.index', compact('settings', 'paginated', 'sort'));
+    }
+    
+    private function extractReviews($data, $depth = 0)
+    {
+        if ($depth > 10 || !is_array($data)) return [];
+        
+        $reviews = [];
+        
+        // Прямой поиск
+        if (isset($data['reviews']) && is_array($data['reviews'])) {
+            foreach ($data['reviews'] as $r) {
+                if (is_array($r) && isset($r['text'])) {
+                    $reviews[] = [
+                        'author' => $r['author']['name'] ?? $r['author'] ?? $r['user']['name'] ?? 'Аноним',
+                        'date' => $this->formatDate($r['date'] ?? $r['created'] ?? $r['datePublished'] ?? null),
+                        'rating' => $r['rating'] ?? $r['stars'] ?? null,
+                        'text' => $r['text'] ?? $r['content'] ?? $r['reviewBody'] ?? '',
+                    ];
+                }
+            }
+        }
+        
+        // Рекурсивный поиск
+        foreach ($data as $value) {
+            if (is_array($value)) {
+                $reviews = array_merge($reviews, $this->extractReviews($value, $depth + 1));
+            }
+        }
+        
+        return $reviews;
+    }
+    
+    private function extractFromInitialState($data)
+    {
+        if (!is_array($data)) return [];
+        
+        $reviews = [];
+        
+        if (isset($data['reviews']['items']) && is_array($data['reviews']['items'])) {
+            foreach ($data['reviews']['items'] as $r) {
+                if (isset($r['text'])) {
+                    $reviews[] = [
+                        'author' => $r['author']['name'] ?? $r['user']['name'] ?? 'Аноним',
+                        'date' => $this->formatDate($r['date'] ?? $r['createdAt'] ?? null),
+                        'rating' => $r['rating'] ?? $r['stars'] ?? null,
+                        'text' => $r['text'] ?? $r['content'] ?? '',
+                    ];
+                }
+            }
+        }
+        
+        return $reviews;
+    }
+    
+    private function formatDate($date)
+    {
+        if (!$date) return date('Y-m-d');
+        $timestamp = is_numeric($date) ? $date : strtotime($date);
+        return $timestamp ? date('Y-m-d', $timestamp) : date('Y-m-d');
+    }
+}
