@@ -62,7 +62,7 @@ class YandexMapsController extends Controller
                 $document = new Document($html);
                 
                 // Ищем блоки с отзывами
-                $reviewBlocks = $document->find('div[class*="review"], div[class*="Review"], div[data-testid*="review"]');
+                $reviewBlocks = $document->find('div[data-testid="review"], div[class*="review"][class*="item"], div[class*="Review"][class*="Item"], .business-reviews-view__review, .feedback__item');
                 
                 foreach ($reviewBlocks as $block) {
                     $review = $this->extractReviewFromBlock($block);
