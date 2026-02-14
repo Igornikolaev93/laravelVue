@@ -8,6 +8,11 @@
         <p><strong>Rating:</strong> {{ $settings->rating ?? 'N/A' }}</p>
         <p><strong>Total Reviews:</strong> {{ $settings->total_reviews ?? 'N/A' }}</p>
 
+        <div class="d-flex justify-content-end mb-3">
+            <a href="{{ route('yandex-maps.index', ['sort' => 'newest']) }}" class="btn btn-sm btn-light {{ $sort === 'newest' ? 'active' : '' }}">Newest</a>
+            <a href="{{ route('yandex-maps.index', ['sort' => 'oldest']) }}" class="btn btn-sm btn-light {{ $sort === 'oldest' ? 'active' : '' }}">Oldest</a>
+        </div>
+
         <table class="table">
             <thead>
                 <tr>
@@ -33,7 +38,7 @@
             </tbody>
         </table>
 
-        {{-- TODO: Add pagination and sorting --}}
+        {{ $reviews->links() }}
     @else
         <p>Please configure the Yandex Maps URL in the <a href="{{ route('yandex-maps.settings') }}">settings</a>.</p>
     @endif
