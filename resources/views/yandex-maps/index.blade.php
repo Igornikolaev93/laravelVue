@@ -16,31 +16,30 @@
 
         <!-- Content -->
         <div class="content">
-            <!-- URL Input Form -->
-            <div class="url-form-container">
-                <form action="{{ route('yandex-maps.index') }}" method="POST">
-                    @csrf
-                    <input type="text" name="yandex_maps_url" class="url-input" placeholder="Enter Yandex Maps URL" value="{{ $settings->yandex_maps_url ?? '' }}" required>
-                    <button type="submit" class="submit-button">Fetch Reviews</button>
-                </form>
-                @if ($errors->any())
-                    <div class="alert alert-danger" style="margin-top: 10px;">
-                        {{ $errors->first() }}
-                    </div>
-                @endif
-                @if (session('error'))
-                    <div class="alert alert-danger" style="margin-top: 10px;">
-                        {{ session('error') }}
-                    </div>
-                @endif
-                @if (session('success'))
-                    <div class="alert alert-success" style="margin-top: 10px;">
-                        {{ session('success') }}
-                    </div>
-                @endif
-            </div>
 
             @if ($settings && $settings->yandex_maps_url)
+                <div class="url-form-container">
+                    <form action="{{ route('yandex-maps.index') }}" method="POST">
+                        @csrf
+                        <input type="text" name="yandex_maps_url" class="url-input" placeholder="Enter Yandex Maps URL" value="{{ $settings->yandex_maps_url ?? '' }}" required>
+                        <button type="submit" class="submit-button">Fetch Reviews</button>
+                    </form>
+                    @if ($errors->any())
+                        <div class="alert alert-danger" style="margin-top: 10px;">
+                            {{ $errors->first() }}
+                        </div>
+                    @endif
+                    @if (session('error'))
+                        <div class="alert alert-danger" style="margin-top: 10px;">
+                            {{ session('error') }}
+                        </div>
+                    @endif
+                    @if (session('success'))
+                        <div class="alert alert-success" style="margin-top: 10px;">
+                            {{ session('success') }}
+                        </div>
+                    @endif
+                </div>
                 @if (count($reviews) > 0)
                     <!-- Rating Block -->
                     <div class="rating-platform">
@@ -101,10 +100,24 @@
                     </div>
                 @endif
             @else
-                <div class="review-card">
-                    <div class="review-text">
-                        Please provide a Yandex Maps URL above to fetch reviews.
-                    </div>
+                <div class="url-form-container">
+                    <h2>Подключить Яндекс</h2>
+                    <p>Укажите ссылку на Яндекс, пример</p>
+                    <form action="{{ route('yandex-maps.index') }}" method="POST">
+                        @csrf
+                        <input type="text" name="yandex_maps_url" class="url-input" placeholder="https://yandex.ru/maps/org/samoye_populyarnoye_kafe/1010501395/reviews/" required>
+                        <button type="submit" class="submit-button">Сохранить</button>
+                    </form>
+                    @if ($errors->any())
+                        <div class="alert alert-danger" style="margin-top: 10px;">
+                            {{ $errors->first() }}
+                        </div>
+                    @endif
+                    @if (session('error'))
+                        <div class="alert alert-danger" style="margin-top: 10px;">
+                            {{ session('error') }}
+                        </div>
+                    @endif
                 </div>
             @endif
         </div>
