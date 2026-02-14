@@ -1,11 +1,296 @@
-@import 'tailwindcss';
+/* styles.css */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
 
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-@source '../../storage/framework/views/*.php';
-@source '../**/*.blade.php';
-@source '../**/*.js';
+body {
+    font-family: 'Mulish', sans-serif;
+    background-color: #f0f2f5;
+    color: #363740;
+    line-height: 1.5;
+}
 
-@theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    background-color: white;
+    box-shadow: 0 0 20px rgba(0,0,0,0.05);
+}
+
+/* --- Шапка --- */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 30px;
+    border-bottom: 1px solid #DCE4EA;
+    background-color: white;
+}
+
+.logo-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.logo-icon {
+    color: #0256B2;
+    font-size: 24px;
+    font-weight: bold;
+}
+
+.logo-text {
+    font-size: 24px;
+    font-weight: 700;
+    color: #363740;
+    letter-spacing: 0.5px;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.icon-placeholder {
+    font-size: 24px;
+    color: #909AB4;
+    cursor: default;
+}
+
+.avatar {
+    width: 40px;
+    height: 40px;
+    background-color: #D9D9D9;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+/* --- Основной макет: меню + контент --- */
+.main-layout {
+    display: flex;
+}
+
+/* --- Боковое меню --- */
+.sidebar {
+    width: 280px;
+    background-color: #F6F8FA;
+    padding: 20px 15px;
+    min-height: calc(100vh - 75px); /* Высота экрана минус высота шапки */
+    flex-shrink: 0;
+}
+
+.account-name {
+    font-weight: 700;
+    color: #6C757D;
+    font-size: 16px;
+    letter-spacing: 0.2px;
+    margin-bottom: 20px;
+    padding-left: 10px;
+}
+
+.menu {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 12px 15px;
+    border-radius: 12px;
+    cursor: default;
+    color: #363740;
+    font-weight: 500;
+    font-size: 16px;
+}
+
+.menu-item.active {
+    background-color: white;
+    box-shadow: 0 2px 1px rgba(0, 0, 0, 0.02);
+}
+
+.menu-icon {
+    font-size: 24px;
+    color: #DCE4EA; /* Цвет, как у SVG в оригинале */
+    width: 24px;
+    text-align: center;
+}
+
+.menu-item.active .menu-icon {
+    /* Можно задать другой цвет для активного пункта, но в макете он серый */
+}
+
+/* --- Контентная область --- */
+.content {
+    flex-grow: 1;
+    padding: 30px;
+    background-color: white;
+}
+
+/* --- Блок с рейтингом --- */
+.rating-platform {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: white;
+    padding: 15px 20px;
+    border-radius: 12px;
+    box-shadow: 0 3px 6px rgba(92, 101, 111, 0.30);
+    outline: 1px solid #E0E7EC;
+    margin-bottom: 30px;
+}
+
+.rating-block {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background-color: #F6F8FA;
+    padding: 8px 16px;
+    border-radius: 12px;
+}
+
+.rating-icon {
+    color: #FF4433;
+    font-size: 18px;
+}
+
+.platform-name {
+    font-weight: 700;
+    font-size: 12px;
+    color: #363740;
+}
+
+.rating-stars-block {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.rating-value {
+    font-size: 40px;
+    font-weight: 500;
+    color: #363740;
+    line-height: 1;
+}
+
+.stars {
+    font-size: 24px;
+    color: #FBBC04;
+    letter-spacing: 2px;
+}
+
+.total-reviews {
+    font-size: 12px;
+    font-weight: 700;
+    color: #363740;
+    border-left: 2px solid #F1F4F7;
+    padding-left: 15px;
+}
+
+/* --- Карточка отзыва --- */
+.review-card {
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: 0 3px 6px rgba(92, 101, 111, 0.30);
+    outline: 1px solid #E0E7EC;
+    margin-bottom: 25px;
+    overflow: hidden;
+}
+
+.review-header {
+    background-color: #F6F8FA;
+    padding: 15px 20px 10px 20px;
+    display: flex;
+    gap: 20px;
+    font-weight: 700;
+    font-size: 12px;
+    color: #363740;
+    border-radius: 12px 12px 0 0;
+}
+
+.review-author-info {
+    padding: 0 20px 5px 20px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.review-author {
+    font-weight: 700;
+    font-size: 12px;
+}
+
+.review-phone {
+    font-weight: 700;
+    font-size: 10px;
+    color: #363740;
+}
+
+.review-images {
+    padding: 5px 20px 10px 20px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.image-placeholder {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background-color: #F0F0F0;
+    border-radius: 4px;
+    font-size: 14px;
+    color: #6C757D;
+    border: 1px solid #E0E7EC;
+}
+
+.review-text {
+    padding: 0 20px 20px 20px;
+    font-size: 12px;
+    font-weight: 400;
+    color: black;
+    line-height: 1.6;
+}
+
+/* Линия под звездами (имитация) */
+.rating-stars-block {
+    position: relative;
+}
+.rating-stars-block::after {
+    content: '';
+    position: absolute;
+    bottom: -15px;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background-color: #F1F4F7;
+    display: none; /* Убрал, т.к. в дизайне она только под блоком цифры, а не под всей строкой */
+}
+/* Более точная имитация линии из дизайна (под блоком рейтинга) */
+.rating-platform {
+    position: relative;
+}
+.rating-platform::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    width: 240px;
+    height: 2px;
+    background-color: #F1F4F7;
+    display: none; /* Линия была под блоком цифры, а не под всем блоком */
+}
+/* Добавим линию через псевдоэлемент для поля с рейтингом */
+.rating-stars-block {
+    position: relative;
+}
+.rating-stars-block .total-reviews {
+    border-left: 2px solid #F1F4F7;
 }
