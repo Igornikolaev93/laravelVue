@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class YandexMapsSettings extends Model
+class YandexMapsSetting extends Model
 {
     use HasFactory;
 
@@ -15,6 +15,5 @@ class YandexMapsSettings extends Model
         'total_reviews'
     ];
     
-    // Если нужно, укажите таблицу явно
     protected $table = 'yandex_maps_settings';
 }
