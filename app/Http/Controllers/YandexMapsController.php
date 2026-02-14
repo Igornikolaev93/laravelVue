@@ -99,6 +99,6 @@ class YandexMapsController extends Controller
             'yandex_maps_url' => $validated['yandex_maps_url'],
         ]);
 
-        return redirect()->back()->with('success', 'Settings saved successfully!');
+        return redirect()->route('yandex-maps.index')->with('success', 'Settings saved successfully!');
     }
 }
