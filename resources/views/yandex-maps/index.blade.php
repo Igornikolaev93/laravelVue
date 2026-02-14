@@ -30,7 +30,7 @@
     </div>
 
     @if ($settings && $settings->yandex_maps_url)
-        @if ($paginated->count() > 0)
+        @if(isset($paginated) && $paginated->count() > 0)
             <div class="rating-block">
                 <span class="platform-name">Яндекс Карты</span>
                 <span class="rating-value">{{ $settings->rating ?? 'N/A' }}</span>
