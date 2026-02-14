@@ -39,7 +39,7 @@
                         <span class="rating-value">{{ $settings->rating ?? 'N/A' }}</span>
                         <div class="stars">
                             @php
-                                $rating = round($settings->rating ?? 0);
+                                $rating = round((float)($settings->rating ?? 0));
                                 echo str_repeat('★', $rating) . str_repeat('☆', 5 - $rating);
                             @endphp
                         </div>
@@ -59,7 +59,7 @@
                             <span class="review-author">{{ $review['author'] }}</span>
                             <div class="stars" style="font-size: 16px;">
                                 @php
-                                    $reviewRating = round($review['rating'] ?? 0);
+                                    $reviewRating = round((float)($review['rating'] ?? 0));
                                     echo str_repeat('★', $reviewRating) . str_repeat('☆', 5 - $reviewRating);
                                 @endphp
                             </div>
