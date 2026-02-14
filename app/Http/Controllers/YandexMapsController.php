@@ -19,39 +19,33 @@ class YandexMapsController extends Controller
         if ($settings && $settings->yandex_maps_url) {
             try {
                 $client = new Client(['headers' => ['User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36']]);
-                $response = $client->request('GET', $settings->yandex_maps_url);
+                $response = $client->request('GET', $settings->yandex_maps_url, ['http_errors' => false]);
                 $html = (string) $response->getBody();
                 $document = new Document($html);
 
-                if ($document->has('.business-card-summary-scores-view__rating-value')) {
-                    $settings->rating = $document->first('.business-card-summary-scores-view__rating-value')->text();
+                if ($document->has('.business-summary-rating-badge-view__rating-value')) {
+                    $settings->rating = $document->first('.business-summary-rating-badge-view__rating-value')->text();
                 }
 
-                if ($document->has('.business-card-summary-scores-view__reviews-count')) {
-                    $fullText = $document->first('.business-card-summary-scores-view__reviews-count')->text();
-                    preg_match('/\d+/', $fullText, $matches);
-                    if ($matches) {
-                        $settings->total_reviews = $matches[0];
-                    }
+                if ($document->has('.business-summary-rating-badge-view__reviews-count')) {
+                    $settings->total_reviews = $document->first('.business-summary-rating-badge-view__reviews-count')->text();
                 }
                 $settings->save();
 
 
-                $reviewElements = $document->find('.business-reviews-card-view__review');
+                $reviewElements = $document->find('.business-review-view');
 
                 foreach ($reviewElements as $element) {
-                    $author = $element->first('.business-review-view__author-name') ? $element->first('.business-review-view__author-name')->text() : 'N/A';
+                    $author = $element->first('.business-review-view__author .business-user-title__title') ? $element->first('.business-review-view__author .business-user-title__title')->text() : 'N/A';
                     $text = $element->first('.business-review-view__body-text') ? $element->first('.business-review-view__body-text')->text() : '';
                     $date = $element->first('.business-review-view__date') ? $element->first('.business-review-view__date')->text() : '';
 
                     $ratingValue = 'N/A';
-                    $ratingStarsElement = $element->first('span[class*="_nb-rating-stars"]');
-                    if ($ratingStarsElement && $ratingStarsElement->hasAttribute('aria-label')) {
-                        preg_match('/(\d+)/', $ratingStarsElement->getAttribute('aria-label'), $matches);
-                        if ($matches) {
-                            $ratingValue = $matches[0];
-                        }
+                    $ratingElement = $element->first('meta[itemprop="ratingValue"]');
+                    if ($ratingElement) {
+                        $ratingValue = $ratingElement->getAttribute('content');
                     }
+
 
                     $reviews[] = [
                         'author' => trim($author),
