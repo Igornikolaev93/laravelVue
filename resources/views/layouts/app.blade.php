@@ -227,11 +227,6 @@ body {
     top: 180px;
 }
 
-.settings {
-    left: 65px;
-    top: 205px;
-}
-
 /* Account name */
 .account-name,
 [data-layer="3"] {
@@ -430,7 +425,6 @@ body {
             <!-- Sidebar menu items -->
             <div data-layer="Selector" class="sidebar-selector"></div>
             <div data-layer="Overview" class="sidebar-menu-item reviews"><a href="{{ route('yandex-maps.index') }}">Отзывы</a></div>
-            <div data-layer="Overview" class="sidebar-menu-item settings"><a href="{{ route('yandex-maps.settings') }}">Настройка</a></div>
             
             <!-- Account name -->
             <div data-layer="3" class="account-name">Название аккаунта</div>
