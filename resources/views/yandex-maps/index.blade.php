@@ -2,7 +2,7 @@
 
 @section('content')
 <div class="container">
-    <h1>Yandex Maps Reviews</h1>
+    <h1 class="campaign-title" style="position: static; margin-bottom: 20px;">Yandex Maps Reviews</h1>
 
     @if ($settings)
         <p><strong>Rating:</strong> {{ $settings->rating ?? 'N/A' }}</p>
@@ -40,7 +40,7 @@
 
         {{ $reviews->links() }}
     @else
-        <p>Please configure the Yandex Maps URL in the <a href="{{ route('yandex-maps.settings') }}">settings</a>.</p>
+        <p class="input-label" style="position: static; margin-bottom: 20px;">Please configure the Yandex Maps URL in the <a href="{{ route('yandex-maps.settings') }}">settings</a>.</p>
     @endif
 </div>
 @endsection
