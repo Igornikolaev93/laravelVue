@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\YandexMapsSetting;
+use App\Models\YandexMapsSettings;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use GuzzleHttp\Client;
@@ -14,11 +14,21 @@ class YandexMapsController extends Controller
     {
         if ($request->isMethod('post')) {
             $validated = $request->validate(['yandex_maps_url' => 'required|url']);
-            YandexMapsSetting::updateOrCreate(['id' => 1], ['yandex_maps_url' => $validated['yandex_maps_url']]);
+            
+            // При сохранении нового URL сбрасываем старые данные
+            YandexMapsSettings::updateOrCreate(
+                ['id' => 1], 
+                [
+                    'yandex_maps_url' => $validated['yandex_maps_url'],
+                    'rating' => null,
+                    'total_reviews' => 0
+                ]
+            );
+            
             return redirect()->route('yandex-maps.index')->with('success', 'URL saved. Fetching reviews...');
         }
 
-        $settings = YandexMapsSetting::first();
+        $settings = YandexMapsSettings::first();
         if (!$settings || !$settings->yandex_maps_url) {
             return view('yandex-maps.connect');
         }
@@ -69,14 +79,24 @@ class YandexMapsController extends Controller
             }
             
             // Мета-теги
-            if (empty($reviews)) {
-                preg_match('/itemprop="ratingValue"\s+content="([^"]*)"/i', $html, $r);
-                preg_match('/itemprop="reviewCount"\s+content="([^"]*)"/i', $html, $c);
-                
-                $settings->rating = isset($r[1]) ? (float) $r[1] : null;
-                $settings->total_reviews = isset($c[1]) ? (int) $c[1] : 0;
-                $settings->save();
+            preg_match('/itemprop="ratingValue"\\s+content="([^"]*)"/i', $html, $r);
+            preg_match('/itemprop="reviewCount"\\s+content="([^"]*)"/i', $html, $c);
+            
+            // Обновляем данные в БД
+            $settings->rating = isset($r[1]) ? (float) $r[1] : null;
+            $settings->total_reviews = isset($c[1]) ? (int) $c[1] : 0;
+            
+            // Если нашли отзывы, обновляем рейтинг на основе них
+            if (!empty($reviews)) {
+                $ratings = array_column($reviews, 'rating');
+                $ratings = array_filter($ratings, fn($r) => is_numeric($r) && $r > 0);
+                if (!empty($ratings)) {
+                    $settings->rating = round(array_sum($ratings) / count($ratings), 1);
+                }
+                $settings->total_reviews = count($reviews);
             }
+            
+            $settings->save();
             
         } catch (\Exception $e) {
             Log::error('Yandex fetch failed: ' . $e->getMessage());
@@ -109,21 +129,32 @@ class YandexMapsController extends Controller
         
         $reviews = [];
         
-        // Прямой поиск
-        if (isset($data['reviews']) && is_array($data['reviews'])) {
-            foreach ($data['reviews'] as $r) {
-                if (is_array($r) && isset($r['text'])) {
+        if (isset($data['review']) && is_array($data['review'])) {
+            foreach ($data['review'] as $r) {
+                if (is_array($r) && isset($r['reviewBody'])) {
                     $reviews[] = [
-                        'author' => $r['author']['name'] ?? $r['author'] ?? $r['user']['name'] ?? 'Аноним',
-                        'date' => $this->formatDate($r['date'] ?? $r['created'] ?? $r['datePublished'] ?? null),
-                        'rating' => $r['rating'] ?? $r['stars'] ?? null,
-                        'text' => $r['text'] ?? $r['content'] ?? $r['reviewBody'] ?? '',
+                        'author' => $r['author']['name'] ?? $r['author'] ?? 'Аноним',
+                        'date' => $this->formatDate($r['datePublished'] ?? $r['dateCreated'] ?? null),
+                        'rating' => $r['reviewRating']['ratingValue'] ?? null,
+                        'text' => $r['reviewBody'] ?? '',
                     ];
                 }
             }
         }
         
-        // Рекурсивный поиск
+        if (isset($data['reviews']) && is_array($data['reviews'])) {
+            foreach ($data['reviews'] as $r) {
+                if (is_array($r) && isset($r['reviewBody'])) {
+                    $reviews[] = [
+                        'author' => $r['author']['name'] ?? $r['author'] ?? 'Аноним',
+                        'date' => $this->formatDate($r['datePublished'] ?? $r['dateCreated'] ?? null),
+                        'rating' => $r['reviewRating']['ratingValue'] ?? null,
+                        'text' => $r['reviewBody'] ?? '',
+                    ];
+                }
+            }
+        }
+        
         foreach ($data as $value) {
             if (is_array($value)) {
                 $reviews = array_merge($reviews, $this->extractReviews($value, $depth + 1));
@@ -139,16 +170,38 @@ class YandexMapsController extends Controller
         
         $reviews = [];
         
-        if (isset($data['reviews']['items']) && is_array($data['reviews']['items'])) {
-            foreach ($data['reviews']['items'] as $r) {
-                if (isset($r['text'])) {
-                    $reviews[] = [
-                        'author' => $r['author']['name'] ?? $r['user']['name'] ?? 'Аноним',
-                        'date' => $this->formatDate($r['date'] ?? $r['createdAt'] ?? null),
-                        'rating' => $r['rating'] ?? $r['stars'] ?? null,
-                        'text' => $r['text'] ?? $r['content'] ?? '',
-                    ];
+        // Разные возможные пути к отзывам в INITIAL_STATE
+        $paths = [
+            ['reviews', 'items'],
+            ['business', 'reviews', 'items'],
+            ['searchContext', 'reviews', 'items'],
+            ['store', 'reviews', 'items'],
+        ];
+        
+        foreach ($paths as $path) {
+            $current = $data;
+            $valid = true;
+            
+            foreach ($path as $key) {
+                if (!isset($current[$key]) || !is_array($current[$key])) {
+                    $valid = false;
+                    break;
                 }
+                $current = $current[$key];
+            }
+            
+            if ($valid && is_array($current)) {
+                foreach ($current as $r) {
+                    if (isset($r['text'])) {
+                        $reviews[] = [
+                            'author' => $r['author']['name'] ?? $r['user']['name'] ?? $r['userName'] ?? 'Аноним',
+                            'date' => $this->formatDate($r['date'] ?? $r['createdAt'] ?? $r['datePublished'] ?? null),
+                            'rating' => $r['rating'] ?? $r['stars'] ?? $r['score'] ?? null,
+                            'text' => $r['text'] ?? $r['content'] ?? $r['reviewText'] ?? '',
+                        ];
+                    }
+                }
+                if (!empty($reviews)) break;
             }
         }
         
