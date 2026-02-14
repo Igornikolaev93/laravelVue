@@ -55,15 +55,15 @@ class YandexMapsController extends Controller
     public function saveSettings(Request $request)
     {
         $validated = $request->validate([
-            'url' => 'required|url',
+            'yandex_maps_url' => 'required|url',
         ]);
 
         YandexMapsSettings::updateOrCreate([
             'id' => 1,
         ], [
-            'url' => $validated['url'],
+            'yandex_maps_url' => $validated['yandex_maps_url'],
         ]);
 
-        return redirect()->route('yandex-maps.settings')->with('success', 'Settings saved successfully!');
+        return redirect()->back()->with('success', 'Settings saved successfully!');
     }
 }

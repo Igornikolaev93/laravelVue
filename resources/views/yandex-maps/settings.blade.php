@@ -5,9 +5,14 @@
     <h1 class="campaign-title" style="position: static; margin-bottom: 20px;">Yandex Maps Settings</h1>
 
     @if (session('success'))
-        <div class="alert alert-success">
+        <div class="alert alert-success" id="success-alert">
             {{ session('success') }}
         </div>
+        <script>
+            setTimeout(function() {
+                document.getElementById('success-alert').style.display = 'none';
+            }, 3000);
+        </script>
     @endif
 
     <form action="{{ route('yandex-maps.save-settings') }}" method="POST">
