@@ -18,22 +18,26 @@ class YandexMapsController extends Controller
 
         if ($settings && $settings->yandex_maps_url) {
             try {
-                $client = new Client();
+                $client = new Client(['headers' => ['User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36']]);
                 $response = $client->request('GET', $settings->yandex_maps_url);
                 $html = (string) $response->getBody();
                 $document = new Document($html);
 
-                if ($document->has('.business-summary-rating-badge-view__rating')) {
-                    $settings->rating = $document->first('.business-summary-rating-badge-view__rating')->text();
+                if ($document->has('.business-card-summary-scores-view__rating-value')) {
+                    $settings->rating = $document->first('.business-card-summary-scores-view__rating-value')->text();
                 }
 
-                if ($document->has('.business-summary-rating-badge-view__reviews-count')) {
-                    $settings->total_reviews = $document->first('.business-summary-rating-badge-view__reviews-count')->text();
+                if ($document->has('.business-card-summary-scores-view__reviews-count')) {
+                    $fullText = $document->first('.business-card-summary-scores-view__reviews-count')->text();
+                    preg_match('/\d+/', $fullText, $matches);
+                    if ($matches) {
+                        $settings->total_reviews = $matches[0];
+                    }
                 }
                 $settings->save();
 
 
-                $reviewElements = $document->find('.business-review-view');
+                $reviewElements = $document->find('.business-reviews-card-view__review');
 
                 foreach ($reviewElements as $element) {
                     $author = $element->first('.business-review-view__author-name') ? $element->first('.business-review-view__author-name')->text() : 'N/A';
