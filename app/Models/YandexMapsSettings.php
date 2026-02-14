@@ -10,6 +10,6 @@ class YandexMapsSettings extends Model
     use HasFactory;
 
     protected $fillable = [
-        'url',
+        'yandex_maps_url',
     ];
 }
