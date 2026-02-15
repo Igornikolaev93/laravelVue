@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -20,7 +20,6 @@ body {
     justify-content: center;
 }
 
-/* Main Container */
 .main-container,
 [data-layer="Подключение площадок"] {
     width: 1381px;
@@ -31,7 +30,6 @@ body {
     box-shadow: 0 0 20px rgba(0,0,0,0.05);
 }
 
-/* Header */
 .header,
 [data-layer="Rectangle 121"] {
     width: 100%;
@@ -40,7 +38,6 @@ body {
     border-bottom: 1px solid #DCE4EA;
 }
 
-/* Top icons */
 .top-icon,
 [data-layer="Rectangle 122"] {
     position: absolute;
@@ -66,7 +63,6 @@ body {
     top: 31px;
 }
 
-/* Sidebar */
 .sidebar,
 [data-layer="fon"] {
     width: 280px;
@@ -79,7 +75,6 @@ body {
     height: 2014px;
 }
 
-/* Logo */
 .logo,
 [data-layer="Daily Grow"] {
     position: absolute;
@@ -95,7 +90,6 @@ body {
     color: #363740;
 }
 
-/* Logo decorative elements - replacing SVGs */
 .logo-decor {
     position: absolute;
     width: 6px;
@@ -147,7 +141,6 @@ body {
     clip-path: polygon(0 0, 100% 40%, 40% 100%);
 }
 
-/* Menu */
 .menu,
 [data-layer="Menu"] {
     width: 249px;
@@ -198,7 +191,7 @@ body {
     font-size: 20px;
 }
 
-/* Sidebar selectors */
+
 .sidebar-selector,
 [data-layer="Selector"][style*="width: 249px; height: 23px;"] {
     width: 249px;
@@ -212,7 +205,7 @@ body {
     z-index: 2;
 }
 
-/* Sidebar menu items */
+
 .sidebar-menu-item,
 [data-layer="Overview"] {
     color: #363740;
@@ -232,7 +225,7 @@ body {
     top: 205px;
 }
 
-/* Account name */
+
 .account-name,
 [data-layer="3"] {
     position: absolute;
@@ -247,7 +240,7 @@ body {
     z-index: 2;
 }
 
-/* Additional selector */
+
 .additional-selector,
 [data-layer="Selector"][style*="width: 51px;"] {
     width: 51px;
@@ -260,7 +253,7 @@ body {
     z-index: 2;
 }
 
-/* Small arrow */
+
 .small-arrow {
     position: absolute;
     left: 4px;
@@ -270,7 +263,7 @@ body {
     z-index: 3;
 }
 
-/* Main content - Campaign title */
+
 .campaign-title,
 [data-layer="Кампании"] {
     position: absolute;
@@ -283,7 +276,7 @@ body {
     letter-spacing: 0.20px;
 }
 
-/* Input label */
+
 .input-label,
 [data-layer="группа 31"] {
     position: absolute;
@@ -296,7 +289,7 @@ body {
     letter-spacing: 0.20px;
 }
 
-/* Input container */
+
 .input-container,
 [data-layer=""] {
     width: 480px;
@@ -314,7 +307,7 @@ body {
     gap: 15px;
 }
 
-/* Input text */
+
 .input-text,
 [data-layer*="https://yandex.ru"] {
     width: 471px;
@@ -328,12 +321,12 @@ body {
     text-overflow: ellipsis;
 }
 
-/* Duplicate text (hidden) */
+
 .duplicate-text {
     display: none;
 }
 
-/* Button base */
+
 .button-base,
 [data-layer="Base"][style*="background: #339AF0;"] {
     width: 128px;
@@ -345,7 +338,7 @@ body {
     border-radius: 6px;
 }
 
-/* Button container */
+
 .button-container,
 [data-layer="Text"] {
     width: 96px;
@@ -357,7 +350,7 @@ body {
     border-radius: 6px;
 }
 
-/* Button text */
+
 .button-text,
 [data-layer="+ Add Dashlet"] {
     position: absolute;
@@ -371,7 +364,7 @@ body {
     white-space: nowrap;
 }
 
-/* Responsive adjustments */
+
 @media (max-width: 1400px) {
     .main-container {
         width: 100%;
@@ -387,10 +380,10 @@ body {
 </head>
 <body>
     <div data-layer="Подключение площадок" class="main-container">
-        <!-- Header -->
+        
         <div data-layer="Rectangle 121" class="header"></div>
         
-        <!-- Top right icons (replaced SVG with text) -->
+        
         <div data-layer="Rectangle 122" class="top-icon">
             <i class="far fa-square"></i>
         </div>
@@ -401,14 +394,14 @@ body {
             <i class="fas fa-arrow-right"></i>
         </div>
 
-        <!-- Sidebar -->
+        
         <div data-layer="fon" class="sidebar">
-            <!-- Logo (replaced SVG with text) -->
+            
             <div data-layer="Daily Grow" class="logo">
                 <span class="logo-text">Daily Grow</span>
             </div>
 
-            <!-- Logo decorative elements (replaced SVGs with styled divs) -->
+            
             <div class="logo-decor decor-1"></div>
             <div class="logo-decor decor-2"></div>
             <div class="logo-decor decor-3"></div>
@@ -416,7 +409,7 @@ body {
             <div class="logo-decor decor-5"></div>
             <div class="logo-decor decor-6"></div>
 
-            <!-- Menu -->
+            
             <div data-layer="Menu" class="menu">
                 <div data-layer="Selector" class="menu-selector"></div>
                 <div data-layer="Base" class="menu-base"></div>
@@ -427,23 +420,23 @@ body {
                 </div>
             </div>
 
-            <!-- Sidebar menu items -->
+            
             <div data-layer="Selector" class="sidebar-selector"></div>
             <div data-layer="Overview" class="sidebar-menu-item reviews"><a href="{{ route('yandex-maps.index') }}">Отзывы</a></div>
             
-            <!-- Account name -->
+            
             <div data-layer="3" class="account-name">Название аккаунта</div>
             
-            <!-- Additional selector -->
+            
             <div data-layer="Selector" class="additional-selector"></div>
             
-            <!-- Small arrow icon (replaced SVG) -->
+            
             <div class="small-arrow">
                 <i class="fas fa-chevron-down"></i>
             </div>
         </div>
 
-        <!-- Main content -->
+        
         <div class="main-content-area" style="position: absolute; left: 280px; top: 75px; right: 0; bottom: 0; padding: 20px;">
             @yield('content')
         </div>
