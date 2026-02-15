@@ -1,445 +1,144 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Yandex Reviews</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- CSRF Token -->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    <title>{{ config('app.name', 'Laravel') }}</title>
+
+    <!-- Fonts -->
+    <link rel="dns-prefetch" href="//fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css?family=Nunito" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Mulish:wght@400;500;600;700&family=Inter:wght@600&display=swap" rel="stylesheet">
+
+    <!-- Scripts -->
+    @vite(['resources/sass/app.scss', 'resources/js/app.js'])
+
     <style>
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
+        /* Global styles */
+        body {
+            margin: 0;
+            font-family: 'Mulish', 'Inter', sans-serif;
+            background-color: #F9F9F9;
+        }
 
-body {
-    font-family: 'Mulish', sans-serif;
-    background-color: #f0f2f5;
-    display: flex;
-    justify-content: center;
-}
+        /* --- NAVIGATION MENU STYLES --- */
+        .navigation-menu {
+            width: 260px;
+            background: white;
+            min-height: 100vh;
+            padding: 20px 0;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.04);
+            position: fixed;
+            left: 0;
+            top: 0;
+        }
 
-.main-container,
-[data-layer="Подключение площадок"] {
-    width: 1381px;
-    background: white;
-    position: relative;
-    min-height: 2014px;
-    margin: 20px auto;
-    box-shadow: 0 0 20px rgba(0,0,0,0.05);
-}
+        .nav-logo {
+            padding: 0 20px 30px 20px;
+            border-bottom: 1px solid #DCE4EA;
+            margin-bottom: 20px;
+        }
 
-.header,
-[data-layer="Rectangle 121"] {
-    width: 100%;
-    height: 75px;
-    background: white;
-    border-bottom: 1px solid #DCE4EA;
-}
+        .nav-items {
+            list-style: none;
+            padding: 0;
+        }
 
-.top-icon,
-[data-layer="Rectangle 122"] {
-    position: absolute;
-    right: 90px;
-    top: 14px;
-    font-size: 24px;
-    color: #909AB4;
-}
+        .nav-item {
+            margin: 8px 15px;
+        }
 
-.vector-icon {
-    position: absolute;
-    font-size: 20px;
-    color: #909AB4;
-}
+        .nav-link {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            color: #363740;
+            font-size: 16px;
+            font-weight: 500;
+            text-decoration: none;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            gap: 12px;
+        }
 
-.phone-icon {
-    right: 77px;
-    top: 26px;
-}
+        .nav-link:hover {
+            background: rgba(51, 154, 240, 0.1);
+            color: #339AF0;
+        }
 
-.arrow-icon {
-    right: 69px;
-    top: 31px;
-}
+        .nav-link.active {
+            background: #339AF0;
+            color: white;
+            box-shadow: 0px 2px 5px rgba(51, 154, 240, 0.2);
+        }
 
-.sidebar,
-[data-layer="fon"] {
-    width: 280px;
-    background: #F6F8FA;
-    box-shadow: 0px 4px 3px #E5E5E5;
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    height: 2014px;
-}
+        .nav-icon {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
 
-.logo,
-[data-layer="Daily Grow"] {
-    position: absolute;
-    left: 55.25px;
-    top: 34.37px;
-    z-index: 2;
-}
+        .nav-link.active .nav-icon {
+            color: white;
+        }
 
-.logo-text {
-    font-family: 'Mulish', sans-serif;
-    font-size: 24px;
-    font-weight: bold;
-    color: #363740;
-}
+        .main-content {
+            margin-left: 260px;
+            padding: 20px;
+        }
 
-.logo-decor {
-    position: absolute;
-    width: 6px;
-    height: 10px;
-    z-index: 2;
-}
-
-.decor-1 {
-    left: 29.69px;
-    top: 30px;
-    background: #03A3EA;
-    clip-path: polygon(0 0, 100% 50%, 0 100%);
-}
-
-.decor-2 {
-    left: 34.94px;
-    top: 35.25px;
-    background: #039DE5;
-    clip-path: polygon(0 0, 100% 50%, 0 100%);
-}
-
-.decor-3 {
-    left: 40.19px;
-    top: 40.21px;
-    background: #0256B2;
-    clip-path: polygon(0 0, 100% 50%, 0 100%);
-}
-
-.decor-4 {
-    left: 29.69px;
-    top: 35.25px;
-    background: #0399E2;
-    clip-path: polygon(100% 0, 100% 100%, 0 50%);
-}
-
-.decor-5 {
-    left: 34.94px;
-    top: 40.21px;
-    background: #0381D1;
-    clip-path: polygon(100% 0, 100% 100%, 0 50%);
-}
-
-.decor-6 {
-    left: 29px;
-    top: 45.17px;
-    width: 12px;
-    height: 13px;
-    background: #0256B2;
-    clip-path: polygon(0 0, 100% 40%, 40% 100%);
-}
-
-.menu,
-[data-layer="Menu"] {
-    width: 249px;
-    height: 52px;
-    position: absolute;
-    left: 15px;
-    top: 120px;
-    overflow: hidden;
-    z-index: 3;
-}
-
-.menu-selector,
-[data-layer="Menu"] [data-layer="Selector"] {
-    width: 249px;
-    height: 48px;
-    background: white;
-    box-shadow: 0px 2px 1px rgba(0, 0, 0, 0.02);
-    border-radius: 12px;
-}
-
-.menu-base {
-    width: 280px;
-    height: 52px;
-}
-
-.menu-selector-transparent {
-    width: 249px;
-    height: 48px;
-    background: rgba(255, 255, 255, 0);
-    border-radius: 12px;
-}
-
-.menu-text,
-[data-layer="Menu"] [data-layer="Overview"] {
-    position: absolute;
-    left: 51px;
-    top: 14px;
-    color: #363740;
-    font-size: 16px;
-    font-weight: 500;
-}
-
-.menu-icon {
-    position: absolute;
-    left: 15px;
-    top: 12px;
-    color: #DCE4EA;
-    font-size: 20px;
-}
-
-
-.sidebar-selector,
-[data-layer="Selector"][style*="width: 249px; height: 23px;"] {
-    width: 249px;
-    height: 23px;
-    background: white;
-    box-shadow: 0px 2px 1px rgba(0, 0, 0, 0.02);
-    border-radius: 12px;
-    position: absolute;
-    left: 15px;
-    top: 201px;
-    z-index: 2;
-}
-
-
-.sidebar-menu-item,
-[data-layer="Overview"] {
-    color: #363740;
-    font-size: 12px;
-    font-weight: 500;
-    position: absolute;
-    z-index: 2;
-}
-
-.reviews {
-    left: 65px;
-    top: 180px;
-}
-
-.settings {
-    left: 65px;
-    top: 205px;
-}
-
-
-.account-name,
-[data-layer="3"] {
-    position: absolute;
-    left: 15px;
-    top: 72px;
-    color: #6C757D;
-    font-size: 16px;
-    font-family: 'Mulish', sans-serif;
-    font-weight: 700;
-    line-height: 20px;
-    letter-spacing: 0.20px;
-    z-index: 2;
-}
-
-
-.additional-selector,
-[data-layer="Selector"][style*="width: 51px;"] {
-    width: 51px;
-    height: 47.08px;
-    position: absolute;
-    left: 32px;
-    top: 670px;
-    box-shadow: 0px 2px 1px rgba(0, 0, 0, 0.02);
-    border-radius: 12px;
-    z-index: 2;
-}
-
-
-.small-arrow {
-    position: absolute;
-    left: 4px;
-    top: 5.73px;
-    color: #6C757D;
-    font-size: 8px;
-    z-index: 3;
-}
-
-
-.campaign-title,
-[data-layer="Кампании"] {
-    position: absolute;
-    left: 315px;
-    top: 93px;
-    color: #252733;
-    font-size: 16px;
-    font-weight: 600;
-    line-height: 20px;
-    letter-spacing: 0.20px;
-}
-
-
-.input-label,
-[data-layer="группа 31"] {
-    position: absolute;
-    left: 315px;
-    top: 128px;
-    color: #6C757D;
-    font-size: 12px;
-    font-weight: 600;
-    line-height: 20px;
-    letter-spacing: 0.20px;
-}
-
-
-.input-container,
-[data-layer=""] {
-    width: 480px;
-    height: 24px;
-    padding: 6px 14px;
-    position: absolute;
-    left: 315px;
-    top: 157px;
-    background: white;
-    border-radius: 6px;
-    outline: 1px solid #DCE4EA;
-    outline-offset: -1px;
-    display: inline-flex;
-    align-items: center;
-    gap: 15px;
-}
-
-
-.input-text,
-[data-layer*="https://yandex.ru"] {
-    width: 471px;
-    color: #788397;
-    font-size: 12px;
-    font-family: 'Mulish', sans-serif;
-    font-weight: 400;
-    text-decoration: underline;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-
-.duplicate-text {
-    display: none;
-}
-
-
-.button-base,
-[data-layer="Base"][style*="background: #339AF0;"] {
-    width: 128px;
-    height: 25px;
-    position: absolute;
-    left: 315px;
-    top: 199px;
-    background: #339AF0;
-    border-radius: 6px;
-}
-
-
-.button-container,
-[data-layer="Text"] {
-    width: 96px;
-    height: 14.17px;
-    position: absolute;
-    left: 331px;
-    top: 204px;
-    overflow: hidden;
-    border-radius: 6px;
-}
-
-
-.button-text,
-[data-layer="+ Add Dashlet"] {
-    position: absolute;
-    left: 10px;
-    top: -2px;
-    color: white;
-    font-size: 14px;
-    font-family: 'Inter', sans-serif;
-    font-weight: 600;
-    text-align: center;
-    white-space: nowrap;
-}
-
-
-@media (max-width: 1400px) {
-    .main-container {
-        width: 100%;
-        margin: 0;
-    }
-    
-    .sidebar {
-        height: auto;
-        min-height: 100vh;
-    }
-}
+        /* --- ADAPTIVE STYLES --- */
+        @media (max-width: 768px) {
+            .navigation-menu {
+                width: 80px;
+            }
+            .nav-logo span, .nav-link span:not(.nav-icon) {
+                display: none;
+            }
+            .main-content {
+                margin-left: 80px;
+            }
+            .nav-link {
+                justify-content: center;
+                padding: 12px;
+            }
+        }
     </style>
 </head>
 <body>
-    <div data-layer="Подключение площадок" class="main-container">
-        
-        <div data-layer="Rectangle 121" class="header"></div>
-        
-        
-        <div data-layer="Rectangle 122" class="top-icon">
-            <i class="far fa-square"></i>
-        </div>
-        <div data-layer="Vector" class="vector-icon phone-icon">
-            <i class="fas fa-mobile-alt"></i>
-        </div>
-        <div data-layer="Vector" class="vector-icon arrow-icon">
-            <i class="fas fa-arrow-right"></i>
-        </div>
-
-        
-        <div data-layer="fon" class="sidebar">
-            
-            <div data-layer="Daily Grow" class="logo">
-                <span class="logo-text">Daily Grow</span>
+    <div id="app">
+        <!-- Navigation Menu -->
+        <div class="navigation-menu">
+            <div class="nav-logo">
+                <div style="color: #363740; font-size: 20px; font-weight: 700;">Daily Grow</div>
             </div>
-
             
-            <div class="logo-decor decor-1"></div>
-            <div class="logo-decor decor-2"></div>
-            <div class="logo-decor decor-3"></div>
-            <div class="logo-decor decor-4"></div>
-            <div class="logo-decor decor-5"></div>
-            <div class="logo-decor decor-6"></div>
-
-            
-            <div data-layer="Menu" class="menu">
-                <div data-layer="Selector" class="menu-selector"></div>
-                <div data-layer="Base" class="menu-base"></div>
-                <div data-layer="Selector" class="menu-selector-transparent"></div>
-                <a href="{{ route('yandex-maps.index') }}" style="text-decoration: none; color: inherit;"><div data-layer="Overview" class="menu-text">Отзывы</div></a>
-                <div data-layer="User Interface / Repair Tool" class="menu-icon">
-                    <i class="fas fa-tools"></i>
-                </div>
-            </div>
-
-            
-            <div data-layer="Selector" class="sidebar-selector"></div>
-            <div data-layer="Overview" class="sidebar-menu-item reviews"><a href="{{ route('yandex-maps.index') }}">Отзывы</a></div>
-            
-            
-            <div data-layer="3" class="account-name">Название аккаунта</div>
-            
-            
-            <div data-layer="Selector" class="additional-selector"></div>
-            
-            
-            <div class="small-arrow">
-                <i class="fas fa-chevron-down"></i>
-            </div>
+            <ul class="nav-items">
+                <li class="nav-item">
+                    <a href="{{ route('yandex-maps.index') }}" class="nav-link {{ request()->routeIs('yandex-maps.index') ? 'active' : '' }}">
+                        <span class="nav-icon"><i class="fas fa-star"></i></span>
+                        <span>Отзывы</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ route('yandex-maps.settings') }}" class="nav-link {{ request()->routeIs('yandex-maps.settings') ? 'active' : '' }}">
+                        <span class="nav-icon"><i class="fas fa-cog"></i></span>
+                        <span>Настройка</span>
+                    </a>
+                </li>
+            </ul>
         </div>
 
-        
-        <div class="main-content-area" style="position: absolute; left: 280px; top: 75px; right: 0; bottom: 0; padding: 20px;">
+        <!-- Main Content -->
+        <main class="main-content">
             @yield('content')
-        </div>
+        </main>
     </div>
 </body>
 </html>
