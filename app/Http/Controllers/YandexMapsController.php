@@ -48,42 +48,27 @@ class YandexMapsController extends Controller
         $orgId = $this->extractOrganizationId($request->url);
         
         if (!$orgId) {
-            // Если не удалось извлечь ID, пробуем другой метод
-            $orgId = $this->extractOrganizationIdAlternative($request->url);
-        }
-        
-        if (!$orgId) {
             return response()->json([
-                'error' => 'Не удалось извлечь ID организации из URL. Попробуйте другую ссылку.'
+                'success' => false,
+                'error' => 'Не удалось найти ID организации'
             ], 400);
         }
 
-        // Пробуем получить отзывы через API Яндекса
-        $reviews = $this->fetchYandexReviews($orgId);
+        // Пробуем разные методы получения отзывов
+        $reviews = $this->fetchFromYandex($orgId);
 
         if (empty($reviews)) {
-            // Если API не работает, возвращаем понятное сообщение
             return response()->json([
-                'error' => 'Временно не удалось загрузить отзывы. Попробуйте позже.',
-                'reviews' => [],
-                'stats' => [
-                    'total_reviews' => 0,
-                    'average_rating' => 0
-                ]
-            ]);
+                'success' => false,
+                'error' => 'Отзывы не найдены',
+                'reviews' => []
+            ], 404);
         }
 
-        $stats = [
-            'total_reviews' => count($reviews),
-            'average_rating' => 0
-        ];
-
-        if ($stats['total_reviews'] > 0) {
-            $totalRating = array_sum(array_column($reviews, 'rating'));
-            $stats['average_rating'] = round($totalRating / $stats['total_reviews'], 2);
-        }
+        $stats = $this->calculateStats($reviews);
 
         return response()->json([
+            'success' => true,
             'reviews' => $reviews,
             'stats' => $stats
         ]);
@@ -91,21 +76,17 @@ class YandexMapsController extends Controller
 
     private function extractOrganizationId($url)
     {
-        // Паттерны для извлечения ID из URL Яндекса
+        // Паттерны для поиска ID в URL Яндекса
         $patterns = [
             '/org\/(?:[^\/]+\/)?(\d+)/',
             '/organization\/(\d+)/',
             '/maps\/(\d+)/',
-            '/biz\/(\d+)/',
-            '/\/(\d{6,})\/?/',
-            '/reviews\/(\d+)/',
-            '/oid=(\d+)/',
-            '/id=(\d+)/'
+            '/\/(\d{6,})\//',
+            '/reviews\/(\d+)/'
         ];
         
         foreach ($patterns as $pattern) {
             if (preg_match($pattern, $url, $matches)) {
-                Log::info('Found organization ID', ['id' => $matches[1], 'url' => $url]);
                 return $matches[1];
             }
         }
@@ -113,49 +94,42 @@ class YandexMapsController extends Controller
         return null;
     }
 
-    private function extractOrganizationIdAlternative($url)
+    private function fetchFromYandex($orgId)
     {
-        // Альтернативный метод - ищем любое большое число
-        if (preg_match('/(\d{6,})/', $url, $matches)) {
-            return $matches[1];
-        }
-        return null;
-    }
+        // Пробуем разные эндпоинты API
+        $endpoints = [
+            "https://yandex.ru/maps/api/organizations/{$orgId}/reviews?lang=ru&pageSize=50",
+            "https://yandex.ru/maps-api/v2/organizations/{$orgId}/reviews?lang=ru_RU&pageSize=50"
+        ];
 
-    private function fetchYandexReviews($orgId)
-    {
-        try {
-            // Пробуем разные эндпоинты
-            $endpoints = [
-                "https://yandex.ru/maps/api/organizations/{$orgId}/reviews?lang=ru&pageSize=20",
-                "https://yandex.ru/maps-api/v2/organizations/{$orgId}/reviews?lang=ru_RU&pageSize=20"
-            ];
+        foreach ($endpoints as $endpoint) {
+            try {
+                $response = Http::withHeaders([
+                    'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Accept' => 'application/json',
+                    'Accept-Language' => 'ru-RU,ru;q=0.9',
+                    'Referer' => 'https://yandex.ru/maps/'
+                ])->timeout(10)->get($endpoint);
 
-            foreach ($endpoints as $endpoint) {
-                try {
-                    $response = Http::withHeaders([
-                        'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                        'Accept' => 'application/json',
-                        'Accept-Language' => 'ru-RU,ru;q=0.9',
-                        'Referer' => 'https://yandex.ru/maps/'
-                    ])->timeout(10)->get($endpoint);
-
-                    if ($response->successful()) {
-                        $data = $response->json();
-                        $reviews = $this->parseReviews($data);
-                        
-                        if (!empty($reviews)) {
-                            Log::info('Successfully fetched reviews', ['count' => count($reviews)]);
-                            return $reviews;
-                        }
+                if ($response->successful()) {
+                    $data = $response->json();
+                    $reviews = $this->parseReviews($data);
+                    
+                    if (!empty($reviews)) {
+                        Log::info('Got reviews from Yandex', [
+                            'org_id' => $orgId,
+                            'count' => count($reviews)
+                        ]);
+                        return $reviews;
                     }
-                } catch (\Exception $e) {
-                    Log::warning('Endpoint failed', ['endpoint' => $endpoint, 'error' => $e->getMessage()]);
-                    continue;
                 }
+            } catch (\Exception $e) {
+                Log::warning('Yandex API error', [
+                    'endpoint' => $endpoint,
+                    'error' => $e->getMessage()
+                ]);
+                continue;
             }
-        } catch (\Exception $e) {
-            Log::error('Error fetching reviews', ['error' => $e->getMessage()]);
         }
 
         return [];
@@ -165,9 +139,12 @@ class YandexMapsController extends Controller
     {
         $reviews = [];
         
-        // Пробуем разные структуры данных
-        $items = $data['reviews'] ?? $data['data']['reviews'] ?? $data['items'] ?? [];
-        
+        // Ищем отзывы в разных структурах данных
+        $items = $data['reviews'] ?? 
+                $data['data']['reviews'] ?? 
+                $data['items'] ?? 
+                [];
+
         if (!is_array($items)) {
             return $reviews;
         }
@@ -179,13 +156,13 @@ class YandexMapsController extends Controller
                 'rating' => $this->extractRating($item),
                 'text' => $this->extractText($item)
             ];
-            
-            // Добавляем только если есть текст отзыва
+
+            // Добавляем только если есть текст
             if (!empty($review['text']) && strlen($review['text']) > 10) {
                 $reviews[] = $review;
             }
         }
-        
+
         return $reviews;
     }
 
@@ -202,22 +179,37 @@ class YandexMapsController extends Controller
         $date = $item['date'] ?? 
                 $item['createdAt'] ?? 
                 $item['publishDate'] ?? 
-                date('Y-m-d H:i:s');
-                
-        if (is_numeric($date) && strlen((string)$date) === 10) {
-            return date('Y-m-d H:i:s', $date);
+                date('Y-m-d');
+
+        if (is_numeric($date)) {
+            return date('Y-m-d', $date);
         }
-        
-        return date('Y-m-d H:i:s', strtotime($date));
+
+        return date('Y-m-d', strtotime($date));
     }
 
     private function extractRating($item)
     {
-        return (float) ($item['rating'] ?? $item['stars'] ?? $item['rate'] ?? 5);
+        return (int) ($item['rating'] ?? $item['stars'] ?? 0);
     }
 
     private function extractText($item)
     {
-        return trim($item['text'] ?? $item['comment'] ?? $item['message'] ?? '');
+        return trim($item['text'] ?? $item['comment'] ?? '');
+    }
+
+    private function calculateStats($reviews)
+    {
+        $total = count($reviews);
+        $sum = 0;
+        
+        foreach ($reviews as $review) {
+            $sum += $review['rating'];
+        }
+
+        return [
+            'total_reviews' => $total,
+            'average_rating' => $total > 0 ? round($sum / $total, 1) : 0
+        ];
     }
 }

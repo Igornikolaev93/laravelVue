@@ -263,17 +263,15 @@ async function loadReviews(url) {
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                'Accept': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
+                'Accept': 'application/json'
             },
-            body: JSON.stringify({ url }),
-            credentials: 'same-origin'
+            body: JSON.stringify({ url })
         });
 
         const data = await response.json();
 
-        if (!response.ok) {
-            throw new Error(data.error || `Ошибка HTTP: ${response.status}`);
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || 'Ошибка загрузки отзывов');
         }
         
         statusEl.style.display = 'none';
@@ -281,19 +279,18 @@ async function loadReviews(url) {
         if (data.reviews && data.reviews.length > 0) {
             allReviews = data.reviews;
             
-            if (data.stats) {
-                statsContainer.style.display = 'grid';
-                statsContainer.innerHTML = `
-                    <div class="stat-card">
-                        <div class="stat-value">${data.stats.total_reviews || 0}</div>
-                        <div class="stat-label">всего отзывов</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">${(data.stats.average_rating || 0).toFixed(1)}</div>
-                        <div class="stat-label">средний рейтинг</div>
-                    </div>
-                `;
-            }
+            // Показываем статистику
+            statsContainer.style.display = 'grid';
+            statsContainer.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-value">${data.stats.total_reviews}</div>
+                    <div class="stat-label">всего отзывов</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${data.stats.average_rating}</div>
+                    <div class="stat-label">средний рейтинг</div>
+                </div>
+            `;
             
             currentPage = 1;
             renderReviewsPage(currentPage);
