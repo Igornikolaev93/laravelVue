@@ -1,374 +1,312 @@
-@extends('layouts.app')
+('layouts.app')
 
 @section('content')
 <style>
-    .reviews-main-container { 
-        padding: 10px 20px; 
+    .url-info {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 12px;
+        margin-bottom: 30px;
+        border: 1px solid #e9ecef;
     }
-    .reviews-header {
-        display: flex; 
-        justify-content: flex-end; 
-        margin-bottom: 20px; 
+    
+    .url-info p {
+        margin-bottom: 15px;
+        word-break: break-all;
+        color: #495057;
     }
-    .reviews-header-icon { 
-        font-size: 20px; 
-        color: #909AB4; 
-        cursor: pointer;
+    
+    .btn {
+        display: inline-block;
+        padding: 10px 20px;
+        background: #6c757d;
+        color: white;
+        text-decoration: none;
+        border-radius: 6px;
+        font-size: 14px;
+        transition: background 0.2s;
     }
+    
+    .btn:hover {
+        background: #5a6268;
+    }
+    
     .reviews-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
         gap: 20px;
-        align-items: start;
+        margin-top: 20px;
     }
-    .review-card-new {
-        background-color: white;
-        border: 1px solid #E5E9F2;
+    
+    .review-card {
+        background: white;
+        border: 1px solid #e9ecef;
         border-radius: 12px;
         padding: 20px;
-        animation: fadeIn 0.5s ease-out;
-        box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.04);
-        min-height: 150px;
-        transition: transform 0.2s;
+        transition: transform 0.2s, box-shadow 0.2s;
     }
-    .review-card-new:hover {
+    
+    .review-card:hover {
         transform: translateY(-2px);
-        box-shadow: 0px 6px 15px rgba(0, 0, 0, 0.08);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
-    .review-card-new.placeholder {
-        background-color: #F7F8FA;
-        border: 1px dashed #DCE4EA;
-        box-shadow: none;
-        min-height: 100px;
-    }
-    .review-card-new.placeholder:hover {
-        transform: none;
-    }
-
-    .review-card-new-header {
+    
+    .review-header {
         display: flex;
-        align-items: center;
         justify-content: space-between;
-        color: #6C757D;
-        font-size: 13px;
-        margin-bottom: 15px;
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-    .review-card-new-header .author {
-        display: flex;
         align-items: center;
-        gap: 5px;
+        margin-bottom: 12px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .review-author {
         font-weight: 600;
-        color: #363740;
-    }
-    .review-card-new-header .branch {
+        color: #2c3e50;
         display: flex;
         align-items: center;
-        gap: 5px;
-        font-weight: 500;
-        background: #F7F8FA;
-        padding: 4px 8px;
-        border-radius: 6px;
+        gap: 8px;
     }
-    .review-card-new-header .branch i {
-        color: #EF4444;
+    
+    .review-author i {
+        color: #6c757d;
     }
-
-    .review-card-new-rating {
-        margin-bottom: 10px;
+    
+    .review-date {
+        color: #6c757d;
+        font-size: 13px;
     }
-    .stars {
-        color: #FFC107;
+    
+    .review-rating {
+        color: #ffc107;
+        margin-bottom: 12px;
+        font-size: 16px;
         letter-spacing: 2px;
+    }
+    
+    .review-text {
+        color: #2c3e50;
+        line-height: 1.6;
         font-size: 14px;
     }
-    .rating-value {
-        color: #6C757D;
-        font-size: 12px;
-        margin-left: 5px;
+    
+    .loading {
+        text-align: center;
+        padding: 60px;
+        color: #6c757d;
     }
-
-    .review-card-new-text {
-        line-height: 1.7;
-        color: #363740;
-        font-size: 14px;
-        font-weight: 400;
-        max-height: 150px;
-        overflow-y: auto;
-        padding-right: 5px;
+    
+    .loading i {
+        margin-right: 8px;
     }
-    .review-card-new-text::-webkit-scrollbar {
-        width: 4px;
+    
+    .error {
+        background: #f8d7da;
+        color: #721c24;
+        padding: 15px;
+        border-radius: 8px;
+        margin: 20px 0;
+        border: 1px solid #f5c6cb;
     }
-    .review-card-new-text::-webkit-scrollbar-track {
-        background: #F7F8FA;
+    
+    .empty-state {
+        text-align: center;
+        padding: 60px;
+        color: #6c757d;
     }
-    .review-card-new-text::-webkit-scrollbar-thumb {
-        background: #DCE4EA;
-        border-radius: 4px;
+    
+    .empty-state i {
+        font-size: 48px;
+        margin-bottom: 20px;
+        color: #dee2e6;
     }
-
+    
     .stats-container {
-        display: flex;
-        align-items: center;
-        gap: 30px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
         margin-bottom: 30px;
-        padding: 20px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 12px;
-        color: white;
     }
-    .stat-item {
+    
+    .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 12px;
         text-align: center;
     }
+    
     .stat-value {
-        font-size: 32px;
+        font-size: 36px;
         font-weight: 700;
-        line-height: 1.2;
+        margin-bottom: 5px;
     }
+    
     .stat-label {
-        font-size: 13px;
+        font-size: 14px;
         opacity: 0.9;
-        margin-top: 5px;
     }
-
-    .no-reviews, .fetch-status { 
-        text-align: center; 
-        padding: 60px 20px; 
-        color: #6C757D; 
-        width: 100%;
-        background: #F7F8FA;
-        border-radius: 12px;
-        font-size: 15px;
-    }
-    .fetch-status.loading {
-        background: #E3F2FD;
-        color: #1976D2;
-        border: 1px solid #BBDEFB;
-    }
-    .fetch-status.error {
-        background: #FFEBEE;
-        color: #C62828;
-        border: 1px solid #FFCDD2;
-    }
-    .fetch-status.success {
-        background: #E8F5E9;
-        color: #2E7D32;
-        border: 1px solid #C8E6C9;
-    }
-
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(-10px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-
+    
     .sort-select {
         width: 200px;
-        padding: 8px 12px;
-        border: 1px solid #E5E9F2;
-        border-radius: 8px;
+        padding: 10px;
+        border: 1px solid #e9ecef;
+        border-radius: 6px;
         margin-bottom: 20px;
-        font-size: 13px;
-        color: #363740;
         background: white;
         cursor: pointer;
     }
+    
     .sort-select:focus {
         outline: none;
         border-color: #667eea;
     }
-
-    .reviews-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 20px;
-    }
-    .reviews-title {
-        font-size: 18px;
-        font-weight: 600;
-        color: #363740;
-    }
 </style>
 
-<div class="reviews-main-container">
-    @if ($settings && $settings->yandex_maps_url)
-        <div class="reviews-header">
-            <span class="reviews-title">Отзывы с Яндекс.Карт</span>
-            <select id="sortSelect" class="sort-select" style="display: none;">
-                <option value="newest">Сначала новые</option>
-                <option value="oldest">Сначала старые</option>
-                <option value="highest">По рейтингу ↓</option>
-                <option value="lowest">По рейтингу ↑</option>
-            </select>
-            <span class="reviews-header-icon"><i class="far fa-clone"></i></span>
-        </div>
-        
-        <div id="statsContainer" class="stats-container" style="display: none;">
-            <div class="stat-item">
-                <div class="stat-value" id="totalReviews">0</div>
-                <div class="stat-label">всего отзывов</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-value" id="avgRating">0.0</div>
-                <div class="stat-label">средний рейтинг</div>
-            </div>
-        </div>
-        
-        <div id="fetchStatus" class="fetch-status loading" style="display: none;"></div>
-        <div id="reviewsList" class="reviews-grid"></div>
+@if($settings && $settings->yandex_maps_url)
+    <div class="url-info">
+        <p><i class="fas fa-link"></i> <strong>URL:</strong> {{ $settings->yandex_maps_url }}</p>
+        <a href="{{ route('yandex-maps.settings') }}" class="btn">
+            <i class="fas fa-edit"></i> Изменить URL
+        </a>
+    </div>
 
-        <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                const url = @json($settings->yandex_maps_url);
-                loadYandexReviews(url);
-            });
+    <div id="status" class="loading">
+        <i class="fas fa-spinner fa-spin"></i> Загрузка отзывов...
+    </div>
+    
+    <div id="statsContainer" class="stats-container" style="display: none;"></div>
+    
+    <select id="sortSelect" class="sort-select" style="display: none;">
+        <option value="newest">Сначала новые</option>
+        <option value="oldest">Сначала старые</option>
+        <option value="highest">Высокий рейтинг</option>
+        <option value="lowest">Низкий рейтинг</option>
+    </select>
+    
+    <div id="reviewsList" class="reviews-grid"></div>
+@else
+    <div class="empty-state">
+        <i class="fas fa-map-marked-alt"></i>
+        <h3>URL не настроен</h3>
+        <p>Перейдите в <a href="{{ route('yandex-maps.settings') }}">настройки</a> чтобы подключить Яндекс.Карты.</p>
+    </div>
+@endif
 
-            let allReviews = [];
-
-            async function loadYandexReviews(url) {
-                const statusEl = document.getElementById('fetchStatus');
-                const listEl = document.getElementById('reviewsList');
-                const statsContainer = document.getElementById('statsContainer');
-                const sortSelect = document.getElementById('sortSelect');
-                
-                statusEl.style.display = 'block';
-                statusEl.className = 'fetch-status loading';
-                statusEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Загрузка отзывов...';
-                listEl.innerHTML = '';
-                statsContainer.style.display = 'none';
-                sortSelect.style.display = 'none';
-                
-                try {
-                    const response = await fetch('{{ route("yandex-maps.fetch-reviews") }}', {
-                        method: 'POST',
-                        headers: { 
-                            'Content-Type': 'application/json', 
-                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                            'Accept': 'application/json'
-                        },
-                        body: JSON.stringify({ url })
-                    });
-                    
-                    const data = await response.json();
-
-                    if (!response.ok) {
-                        throw new Error(data.error || 'Ошибка загрузки');
-                    }
-                    
-                    statusEl.style.display = 'none';
-                    
-                    if (data.reviews && data.reviews.length) {
-                        allReviews = data.reviews;
-                        
-                        // Показываем статистику
-                        statsContainer.style.display = 'flex';
-                        document.getElementById('totalReviews').textContent = data.stats.total_reviews;
-                        document.getElementById('avgRating').textContent = data.stats.average_rating;
-                        
-                        // Показываем сортировку
-                        sortSelect.style.display = 'block';
-                        
-                        // Отображаем отзывы
-                        renderReviews(allReviews);
-                        
-                        // Добавляем обработчик сортировки
-                        sortSelect.onchange = function() {
-                            const sorted = sortReviews([...allReviews], this.value);
-                            renderReviews(sorted);
-                        };
-                    } else {
-                        listEl.innerHTML = '<div class="no-reviews">Нет отзывов для отображения.</div>';
-                    }
-                } catch (e) {
-                    statusEl.className = 'fetch-status error';
-                    statusEl.innerHTML = `❌ Ошибка: ${e.message}`;
-                    console.error('Error:', e);
-                }
-            }
-
-            function renderReviews(reviews) {
-                const listEl = document.getElementById('reviewsList');
-                
-                if (reviews.length === 0) {
-                    listEl.innerHTML = '<div class="no-reviews">Нет отзывов</div>';
-                    return;
-                }
-                
-                listEl.innerHTML = reviews.map(review => {
-                    const reviewDate = review.date ? new Date(review.date.replace(' ', 'T')) : new Date();
-                    const formattedDate = !isNaN(reviewDate)
-                        ? new Intl.DateTimeFormat('ru-RU', { 
-                            day: 'numeric', 
-                            month: 'long', 
-                            year: 'numeric',
-                            hour: '2-digit', 
-                            minute: '2-digit' 
-                        }).format(reviewDate)
-                        : 'Дата не указана';
-
-                    const rating = parseFloat(review.rating) || 0;
-                    const stars = '★'.repeat(Math.round(rating)) + '☆'.repeat(5 - Math.round(rating));
-
-                    return `<div class="review-card-new">
-                        <div class="review-card-new-header">
-                            <span class="author">
-                                <i class="fas fa-user-circle"></i> ${escapeHtml(review.author)}
-                            </span>
-                            <span class="branch">
-                                <i class="fas fa-map-marker-alt"></i> филиал 1
-                            </span>
-                        </div>
-                        <div class="review-card-new-rating">
-                            <span class="stars">${stars}</span>
-                            <span class="rating-value">${rating > 0 ? rating.toFixed(1) : ''}</span>
-                        </div>
-                        <div class="review-card-new-text">${escapeHtml(review.text || 'Нет текста отзыва')}</div>
-                        <div style="margin-top: 10px; font-size: 11px; color: #999; text-align: right;">
-                            ${formattedDate}
-                        </div>
-                    </div>`;
-                }).join('');
-                
-                // Добавляем placeholder карточки для визуальной целостности
-                const placeholderCount = Math.max(0, 3 - (reviews.length % 3));
-                for (let i = 0; i < placeholderCount; i++) {
-                    listEl.innerHTML += '<div class="review-card-new placeholder"></div>';
-                }
-            }
-
-            function sortReviews(reviews, sortBy) {
-                return [...reviews].sort((a, b) => {
-                    switch(sortBy) {
-                        case 'newest':
-                            return new Date(b.date || 0) - new Date(a.date || 0);
-                        case 'oldest':
-                            return new Date(a.date || 0) - new Date(b.date || 0);
-                        case 'highest':
-                            return (parseFloat(b.rating) || 0) - (parseFloat(a.rating) || 0);
-                        case 'lowest':
-                            return (parseFloat(a.rating) || 0) - (parseFloat(b.rating) || 0);
-                        default:
-                            return 0;
-                    }
-                });
-            }
-
-            function escapeHtml(unsafe) {
-                if (!unsafe) return '';
-                return unsafe
-                    .replace(/&/g, "&amp;")
-                    .replace(/</g, "&lt;")
-                    .replace(/>/g, "&gt;")
-                    .replace(/"/g, "&quot;")
-                    .replace(/'/g, "&#039;");
-            }
-        </script>
-    @else
-        <div class="no-reviews">
-            <p>Чтобы увидеть отзывы, перейдите в раздел "Настройка" и подключите Яндекс.Карты.</p>
-        </div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    @if($settings && $settings->yandex_maps_url)
+        loadReviews('{{ $settings->yandex_maps_url }}');
     @endif
-</div>
+});
+
+let allReviews = [];
+
+async function loadReviews(url) {
+    try {
+        const response = await fetch('{{ route("yandex-maps.fetch-reviews") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+            },
+            body: JSON.stringify({ url })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Ошибка загрузки');
+        }
+
+        document.getElementById('status').style.display = 'none';
+        
+        if (data.reviews && data.reviews.length > 0) {
+            allReviews = data.reviews;
+            displayStats(data.stats);
+            renderReviews(allReviews);
+            
+            document.getElementById('sortSelect').style.display = 'block';
+            document.getElementById('sortSelect').addEventListener('change', function() {
+                const sorted = sortReviews([...allReviews], this.value);
+                renderReviews(sorted);
+            });
+        } else {
+            document.getElementById('reviewsList').innerHTML = 
+                '<div class="empty-state">Нет отзывов для отображения</div>';
+        }
+    } catch (error) {
+        document.getElementById('status').innerHTML = 
+            `<div class="error"><i class="fas fa-exclamation-circle"></i> ${error.message}</div>`;
+    }
+}
+
+function displayStats(stats) {
+    const container = document.getElementById('statsContainer');
+    container.style.display = 'grid';
+    container.innerHTML = `
+        <div class="stat-card">
+            <div class="stat-value">${stats.total_reviews}</div>
+            <div class="stat-label">всего отзывов</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">${stats.average_rating}</div>
+            <div class="stat-label">средний рейтинг</div>
+        </div>
+    `;
+}
+
+function renderReviews(reviews) {
+    const html = reviews.map(review => {
+        const date = new Date(review.date);
+        const formattedDate = date.toLocaleDateString('ru-RU', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+        });
+        
+        const stars = '★'.repeat(Math.round(review.rating)) + '☆'.repeat(5 - Math.round(review.rating));
+        
+        return `
+            <div class="review-card">
+                <div class="review-header">
+                    <span class="review-author">
+                        <i class="fas fa-user-circle"></i> ${escapeHtml(review.author)}
+                    </span>
+                    <span class="review-date">
+                        <i class="far fa-calendar-alt"></i> ${formattedDate}
+                    </span>
+                </div>
+                <div class="review-rating">${stars}</div>
+                <div class="review-text">${escapeHtml(review.text)}</div>
+            </div>
+        `;
+    }).join('');
+    
+    document.getElementById('reviewsList').innerHTML = html;
+}
+
+function sortReviews(reviews, sortBy) {
+    return reviews.sort((a, b) => {
+        switch(sortBy) {
+            case 'newest':
+                return new Date(b.date) - new Date(a.date);
+            case 'oldest':
+                return new Date(a.date) - new Date(b.date);
+            case 'highest':
+                return (b.rating || 0) - (a.rating || 0);
+            case 'lowest':
+                return (a.rating || 0) - (b.rating || 0);
+            default:
+                return 0;
+        }
+    });
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+</script>
 @endsection

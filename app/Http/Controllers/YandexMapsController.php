@@ -9,54 +9,57 @@ use Illuminate\Support\Facades\Log;
 
 class YandexMapsController extends Controller
 {
-    private $apiKey = '98ee2162-88df-47ac-8a2d-26df528afe73';
-    
-    public function index(Request $request)
+    public function index()
     {
         $settings = YandexMapsSetting::first();
-        
-        return view('yandex-maps.index', [
-            'settings' => $settings
-        ]);
+        return view('yandex-maps.index', compact('settings'));
     }
 
-    public function settings(Request $request)
+    public function settings()
     {
         $settings = YandexMapsSetting::first();
-        
-        return view('yandex-maps.settings', [
-            'settings' => $settings
-        ]);
+        return view('yandex-maps.settings', compact('settings'));
     }
 
     public function connect(Request $request)
     {
-        $validated = $request->validate([
-            'yandex_maps_url' => 'required|url',
+        $request->validate([
+            'yandex_maps_url' => 'required|url'
         ]);
 
-        YandexMapsSetting::updateOrCreate(
-            ['id' => 1],
-            ['yandex_maps_url' => $validated['yandex_maps_url']]
-        );
+        try {
+            YandexMapsSetting::updateOrCreate(
+                ['id' => 1],
+                ['yandex_maps_url' => $request->yandex_maps_url]
+            );
 
-        return redirect()->route('yandex-maps.settings')->with('success', 'URL saved successfully!');
+            return redirect()->route('yandex-maps.index')
+                ->with('success', 'URL успешно сохранен!');
+        } catch (\Exception $e) {
+            return redirect()->back()
+                ->with('error', 'Ошибка сохранения: ' . $e->getMessage());
+        }
     }
 
     public function fetchReviews(Request $request)
     {
-        $request->validate([
-            'url' => 'required|url'
-        ]);
+        $request->validate(['url' => 'required|url']);
 
         $orgId = $this->extractOrganizationId($request->url);
         
         if (!$orgId) {
-            return response()->json(['error' => 'Invalid organization URL'], 400);
+            return response()->json([
+                'error' => 'Не удалось извлечь ID организации из URL'
+            ], 400);
         }
 
-        // Пробуем разные методы получения отзывов
-        $reviews = $this->getAllReviews($orgId);
+        $reviews = $this->getYandexReviews($orgId);
+
+        if (empty($reviews)) {
+            return response()->json([
+                'error' => 'Не удалось загрузить отзывы. Проверьте URL организации.'
+            ], 404);
+        }
 
         $stats = [
             'total_reviews' => count($reviews),
@@ -74,11 +77,37 @@ class YandexMapsController extends Controller
         ]);
     }
 
-    private function getAllReviews($orgId)
+    private function extractOrganizationId($url)
+    {
+        $patterns = [
+            '/org\/(?:[^\/]+\/)?(\d+)/',
+            '/organization\/(\d+)/',
+            '/maps\/(\d+)/',
+            '/biz\/(\d+)/',
+            '/\/(\d{5,})\/?/',
+            '/reviews\/(\d+)/',
+            '/oid=(\d+)/',
+        ];
+        
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $url, $matches)) {
+                return $matches[1];
+            }
+        }
+        
+        // Пробуем найти любое 6+ значное число
+        if (preg_match('/(\d{6,})/', $url, $matches)) {
+            return $matches[1];
+        }
+        
+        return null;
+    }
+
+    private function getYandexReviews($orgId)
     {
         $allReviews = [];
         $page = 1;
-        $maxPages = 3; // Максимум страниц для загрузки
+        $maxPages = 3;
         
         while ($page <= $maxPages) {
             $reviews = $this->fetchReviewsPage($orgId, $page);
@@ -90,9 +119,9 @@ class YandexMapsController extends Controller
             $allReviews = array_merge($allReviews, $reviews);
             $page++;
             
-            // Небольшая задержка между запросами
+            // Задержка между запросами
             if ($page <= $maxPages) {
-                usleep(500000); // 0.5 секунды
+                usleep(300000);
             }
         }
         
@@ -101,12 +130,9 @@ class YandexMapsController extends Controller
 
     private function fetchReviewsPage($orgId, $page = 1)
     {
-        // Пробуем разные эндпоинты
         $endpoints = [
             "https://yandex.ru/maps/api/organizations/{$orgId}/reviews?lang=ru&page={$page}&pageSize=20",
             "https://yandex.ru/maps-api/v2/organizations/{$orgId}/reviews?lang=ru_RU&page={$page}&pageSize=20",
-            "https://yandex.ru/maps/org/reviews/{$orgId}/?page={$page}",
-            "https://yandex.ru/maps/api/reviews?oid={$orgId}&page={$page}&pageSize=20"
         ];
 
         foreach ($endpoints as $endpoint) {
@@ -117,7 +143,6 @@ class YandexMapsController extends Controller
                     'Accept-Language' => 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
                     'Referer' => 'https://yandex.ru/maps/',
                     'Origin' => 'https://yandex.ru',
-                    'X-Requested-With' => 'XMLHttpRequest'
                 ])->timeout(10)->get($endpoint);
 
                 if ($response->successful()) {
@@ -125,11 +150,6 @@ class YandexMapsController extends Controller
                     $reviews = $this->parseReviews($data);
                     
                     if (!empty($reviews)) {
-                        Log::info('Got reviews from endpoint', [
-                            'endpoint' => $endpoint,
-                            'page' => $page,
-                            'count' => count($reviews)
-                        ]);
                         return $reviews;
                     }
                 }
@@ -146,31 +166,25 @@ class YandexMapsController extends Controller
     {
         $reviews = [];
         
-        // Пробуем разные структуры данных
-        $reviewItems = [];
-        
-        if (isset($data['reviews']) && is_array($data['reviews'])) {
-            $reviewItems = $data['reviews'];
-        } elseif (isset($data['data']['reviews']) && is_array($data['data']['reviews'])) {
-            $reviewItems = $data['data']['reviews'];
-        } elseif (isset($data['items']) && is_array($data['items'])) {
-            $reviewItems = $data['items'];
-        } elseif (isset($data['results']) && is_array($data['results'])) {
-            $reviewItems = $data['results'];
-        }
+        $reviewItems = $data['reviews'] ?? 
+                      $data['data']['reviews'] ?? 
+                      $data['items'] ?? 
+                      [];
 
         foreach ($reviewItems as $item) {
-            $review = [
+            $rating = $item['rating'] ?? $item['stars'] ?? $item['rate'] ?? 0;
+            
+            // Пропускаем отзывы без рейтинга или текста
+            if (empty($item['text']) && empty($item['comment'])) {
+                continue;
+            }
+
+            $reviews[] = [
                 'author' => $this->extractAuthor($item),
                 'date' => $this->extractDate($item),
-                'rating' => $this->extractRating($item),
+                'rating' => (float) $rating,
                 'text' => $this->extractText($item)
             ];
-            
-            // Добавляем только если есть текст отзыва
-            if (!empty($review['text']) && strlen($review['text']) > 5) {
-                $reviews[] = $review;
-            }
         }
         
         return $reviews;
@@ -181,8 +195,6 @@ class YandexMapsController extends Controller
         return $item['author']['name'] ?? 
                $item['user']['name'] ?? 
                $item['authorName'] ?? 
-               $item['userName'] ?? 
-               $item['name'] ?? 
                'Аноним';
     }
 
@@ -191,11 +203,8 @@ class YandexMapsController extends Controller
         $date = $item['date'] ?? 
                 $item['createdAt'] ?? 
                 $item['publishDate'] ?? 
-                $item['time'] ?? 
-                $item['publishedAt'] ?? 
                 date('Y-m-d H:i:s');
                 
-        // Конвертируем timestamp в дату
         if (is_numeric($date) && strlen((string)$date) == 10) {
             return date('Y-m-d H:i:s', $date);
         }
@@ -203,56 +212,11 @@ class YandexMapsController extends Controller
         return date('Y-m-d H:i:s', strtotime($date));
     }
 
-    private function extractRating($item)
-    {
-        $rating = $item['rating'] ?? 
-                  $item['stars'] ?? 
-                  $item['rate'] ?? 
-                  $item['score'] ?? 
-                  $item['averageRating'] ?? 
-                  0;
-                  
-        return (float) $rating;
-    }
-
     private function extractText($item)
     {
         return trim($item['text'] ?? 
                $item['comment'] ?? 
                $item['message'] ?? 
-               $item['content'] ?? 
-               $item['reviewText'] ?? 
-               $item['body'] ?? 
                '');
-    }
-
-    private function extractOrganizationId($url)
-    {
-        $patterns = [
-            '/org\/(?:[^\/]+\/)?(\d+)/',
-            '/organization\/(\d+)/',
-            '/maps\/(\d+)/',
-            '/biz\/(\d+)/',
-            '/\/(\d{5,})\/?/',
-            '/-\/org\/(?:[^\/]+\/)?(\d+)/',
-            '/organizations\/(\d+)/',
-            '/reviews\/(\d+)/',
-            '/oid=(\d+)/',
-            '/id=(\d+)/'
-        ];
-        
-        foreach ($patterns as $pattern) {
-            if (preg_match($pattern, $url, $matches)) {
-                Log::info('Extracted organization ID', ['id' => $matches[1]]);
-                return $matches[1];
-            }
-        }
-        
-        // Пробуем найти любое 6+ значное число
-        if (preg_match('/(\d{6,})/', $url, $matches)) {
-            return $matches[1];
-        }
-        
-        return null;
     }
 }
