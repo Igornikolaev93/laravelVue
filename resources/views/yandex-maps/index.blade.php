@@ -30,41 +30,18 @@
     </div>
 
     @if ($settings && $settings->yandex_maps_url)
-        @if(isset($reviews) && $reviews->count() > 0)
-            <div class="rating-block">
-                <span class="platform-name">Яндекс Карты</span>
-                <span class="rating-value">
-                    {{ is_numeric($settings->rating) ? number_format($settings->rating, 1) : 'N/A' }}
-                </span>
-                @php
-                    $ratingValue = is_numeric($settings->rating) ? round((float)$settings->rating) : 0;
-                    $ratingValue = max(0, min(5, $ratingValue)); // Ограничиваем от 0 до 5
-                @endphp
-                <div class="stars">{{ str_repeat('★', $ratingValue) . str_repeat('☆', 5 - $ratingValue) }}</div>
-                <span>{{ $settings->total_reviews ?? 0 }} отзывов</span>
-            </div>
-
-            @foreach ($reviews as $review)
-                <div class="review-card">
-                    <div class="review-header">
-                        <span>{{ $review['author'] }}</span>
-                        <span>{{ $review['date'] }}</span>
-                        @if(!empty($review['rating']) && is_numeric($review['rating']))
-                            @php
-                                $reviewRating = round((float)$review['rating']);
-                                $reviewRating = max(0, min(5, $reviewRating));
-                            @endphp
-                            <div class="stars">{{ str_repeat('★', $reviewRating) . str_repeat('☆', 5 - $reviewRating) }}</div>
-                        @endif
-                    </div>
-                    <div>{{ $review['text'] }}</div>
-                </div>
-            @endforeach
-
-            <div class="pagination-container">{{ $reviews->appends(['sort' => $sort])->links() }}</div>
-        @else
-            <div class="review-card">No reviews found for this URL. Please check the URL and try again.</div>
-        @endif
+        <div class="rating-block">
+            <span class="platform-name">Яндекс Карты</span>
+            <span class="rating-value">
+                {{ is_numeric($settings->rating) ? number_format($settings->rating, 1) : 'N/A' }}
+            </span>
+            @php
+                $ratingValue = is_numeric($settings->rating) ? round((float)$settings->rating) : 0;
+                $ratingValue = max(0, min(5, $ratingValue)); // Ограничиваем от 0 до 5
+            @endphp
+            <div class="stars">{{ str_repeat('★', $ratingValue) . str_repeat('☆', 5 - $ratingValue) }}</div>
+            <span>{{ $settings->total_reviews ?? 0 }} отзывов</span>
+        </div>
     @endif
 </div>
 @endsection
