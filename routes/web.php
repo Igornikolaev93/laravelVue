@@ -8,3 +8,5 @@ Route::get('/', function () {
 });
 
 Route::match(['get', 'post'], '/yandex-maps', [YandexMapsController::class, 'index'])->name('yandex-maps.index');
+
+Route::post('/yandex-maps/fetch-reviews', [YandexMapsController::class, 'fetchReviews'])->name('yandex-maps.fetch-reviews');

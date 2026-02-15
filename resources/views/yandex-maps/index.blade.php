@@ -324,332 +324,158 @@
     </div>
 
     <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const url = '{{ $settings->yandex_maps_url }}';
-        
-        if (url) {
-            loadYandexReviews(url);
-        }
-    });
-
-    async function loadYandexReviews(url) {
-        const statusDiv = document.getElementById('fetchStatus');
-        const ratingBlock = document.getElementById('ratingBlock');
-        const sortSelect = document.getElementById('sortSelect');
-        const reviewsList = document.getElementById('reviewsList');
-        
-        statusDiv.style.display = 'flex';
-        statusDiv.className = 'fetch-status loading';
-        statusDiv.innerHTML = '<div class="loading-spinner"></div> Извлекаем ID организации...';
-        
-        try {
-            const orgId = extractOrganizationId(url);
-            
-            if (!orgId) {
-                throw new Error('Не удалось извлечь ID организации из URL');
-            }
-            
-            statusDiv.innerHTML = `<div class="loading-spinner"></div> ID организации: ${orgId}. Загружаем отзывы...`;
-            
-            const reviews = await fetchYandexReviews(orgId);
-            
-            if (reviews.length === 0) {
-                statusDiv.className = 'fetch-status error';
-                statusDiv.innerHTML = '❌ Отзывы не найдены для данной организации';
-                return;
-            }
-            
-            statusDiv.className = 'fetch-status success';
-            statusDiv.innerHTML = `✅ Загружено ${reviews.length} отзывов`;
-            
-            displayReviews(reviews);
-            
-            ratingBlock.style.display = 'flex';
-            sortSelect.style.display = 'block';
-            
-            sortSelect.addEventListener('change', function() {
-                const sorted = sortReviews([...reviews], this.value);
-                renderReviews(sorted);
-            });
-            
-        } catch (error) {
-            statusDiv.className = 'fetch-status error';
-            statusDiv.innerHTML = `❌ Ошибка: ${error.message}`;
-            console.error('Error loading reviews:', error);
-        }
+document.addEventListener('DOMContentLoaded', function() {
+    const url = '{{ $settings->yandex_maps_url }}';
+    
+    if (url) {
+        loadYandexReviews(url);
     }
+});
 
-    function extractOrganizationId(url) {
-        const patterns = [
-            /org\/(?:[^\/]+\/)?(\d+)/,
-            /organization\/(\d+)/,
-            /maps\/(\d+)/,
-            /biz\/(\d+)/,
-            /\/(\d{5,})\/?/,
-            /-\/org\/(?:[^\/]+\/)?(\d+)/,
-            /organizations\/(\d+)/
-        ];
+async function loadYandexReviews(url) {
+    const statusDiv = document.getElementById('fetchStatus');
+    const ratingBlock = document.getElementById('ratingBlock');
+    const sortSelect = document.getElementById('sortSelect');
+    
+    statusDiv.style.display = 'flex';
+    statusDiv.className = 'fetch-status loading';
+    statusDiv.innerHTML = '<div class="loading-spinner"></div> Загружаем отзывы через сервер...';
+    
+    try {
+        const response = await fetch('{{ route("yandex-maps.fetch-reviews") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+            },
+            body: JSON.stringify({ url: url })
+        });
         
-        for (const pattern of patterns) {
-            const match = url.match(pattern);
-            if (match) {
-                return match[1];
-            }
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Ошибка при загрузке отзывов');
         }
         
-        return null;
-    }
-
-    async function fetchYandexReviews(orgId) {
-        const endpoints = [
-            `https://yandex.ru/maps/api/organizations/${orgId}/reviews?lang=ru&pageSize=100`,
-            `https://yandex.ru/maps-api/v2/organizations/${orgId}/reviews?lang=ru_RU&pageSize=100`,
-            `https://yandex.ru/maps/org/reviews/${orgId}/`
-        ];
-        
-        const proxies = [
-            'https://corsproxy.io/?',
-            'https://api.allorigins.win/raw?url=',
-            'https://cors-anywhere.herokuapp.com/'
-        ];
-        
-        for (const endpoint of endpoints) {
-            for (const proxy of proxies) {
-                try {
-                    const url = proxy + encodeURIComponent(endpoint);
-                    const response = await fetch(url, {
-                        headers: {
-                            'Accept': 'application/json, text/html',
-                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                        }
-                    });
-                    
-                    if (response.ok) {
-                        const contentType = response.headers.get('content-type');
-                        
-                        if (contentType && contentType.includes('application/json')) {
-                            const data = await response.json();
-                            const reviews = parseJsonReviews(data);
-                            if (reviews.length > 0) {
-                                return reviews;
-                            }
-                        } else {
-                            const html = await response.text();
-                            const reviews = parseHtmlReviews(html);
-                            if (reviews.length > 0) {
-                                return reviews;
-                            }
-                        }
-                    }
-                } catch (e) {
-                    console.log(`Endpoint failed: ${endpoint} with proxy ${proxy}`, e);
-                    continue;
-                }
-            }
-        }
-        
-        return [];
-    }
-
-    function parseJsonReviews(data) {
-        const reviews = [];
-        
-        const reviewItems = data.reviews || 
-                           data.data?.reviews || 
-                           data.items || 
-                           data.results || 
-                           [];
-        
-        if (Array.isArray(reviewItems)) {
-            reviewItems.forEach(item => {
-                const review = {
-                    author: item.author?.name || 
-                           item.user?.name || 
-                           item.authorName || 
-                           'Аноним',
-                    date: item.date || 
-                         item.createdAt || 
-                         item.publishDate || 
-                         new Date().toISOString().split('T')[0],
-                    rating: item.rating || 
-                           item.stars || 
-                           item.rate || 
-                           0,
-                    text: item.text || 
-                         item.comment || 
-                         item.message || 
-                         item.content || 
-                         ''
-                };
-                
-                if (review.text && review.text.trim()) {
-                    reviews.push(review);
-                }
-            });
-        }
-        
-        return reviews;
-    }
-
-    function parseHtmlReviews(html) {
-        const reviews = [];
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        
-        const selectors = [
-            '[class*="review"]',
-            '[class*="Review"]',
-            '[class*="feedback"]',
-            '[class*="response"]',
-            '.business-review',
-            '.org-review'
-        ];
-        
-        for (const selector of selectors) {
-            const elements = doc.querySelectorAll(selector);
-            
-            elements.forEach(el => {
-                const author = extractText(el, ['author', 'user', 'name']) || 'Аноним';
-                const date = extractText(el, ['date', 'time', 'published']) || formatDate(new Date());
-                const rating = extractRating(el);
-                const text = extractText(el, ['text', 'comment', 'message', 'content']) || '';
-                
-                if (text) {
-                    reviews.push({ author, date, rating, text });
-                }
-            });
-            
-            if (reviews.length > 0) {
-                break;
-            }
-        }
-        
-        return reviews;
-    }
-
-    function extractText(element, possibleClasses) {
-        for (const className of possibleClasses) {
-            const found = element.querySelector(`[class*="${className}"]`);
-            if (found && found.textContent) {
-                return found.textContent.trim();
-            }
-        }
-        return null;
-    }
-
-    function extractRating(element) {
-        const ratingSelectors = ['[class*="rating"]', '[class*="stars"]', '[class*="rate"]'];
-        
-        for (const selector of ratingSelectors) {
-            const ratingEl = element.querySelector(selector);
-            if (ratingEl) {
-                const text = ratingEl.textContent || '';
-                const match = text.match(/(\d+(?:\.\d+)?)/);
-                if (match) {
-                    return parseFloat(match[1]);
-                }
-                
-                const stars = (ratingEl.innerHTML.match(/★/g) || []).length;
-                if (stars > 0) {
-                    return stars;
-                }
-            }
-        }
-        
-        return 0;
-    }
-
-    function formatDate(date) {
-        return date.toISOString().split('T')[0];
-    }
-
-    function displayReviews(reviews) {
-        window.allReviews = reviews;
-        
-        const avgRating = reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length;
-        
-        document.getElementById('avgRating').textContent = avgRating.toFixed(1);
-        document.getElementById('totalReviews').textContent = `${reviews.length} ${getReviewWord(reviews.length)}`;
-        
-        const starsContainer = document.getElementById('starsContainer');
-        starsContainer.innerHTML = '';
-        for (let i = 1; i <= 5; i++) {
-            starsContainer.innerHTML += i <= Math.round(avgRating) ? '★' : '☆';
-        }
-        
-        renderReviews(reviews);
-    }
-
-    function renderReviews(reviews) {
-        const reviewsList = document.getElementById('reviewsList');
+        const reviews = await response.json();
         
         if (reviews.length === 0) {
-            reviewsList.innerHTML = '<div class="no-reviews">Нет отзывов</div>';
+            statusDiv.className = 'fetch-status error';
+            statusDiv.innerHTML = '❌ Отзывы не найдены для данной организации';
             return;
         }
         
-        reviewsList.innerHTML = reviews.map(review => `
-            <div class="review-card">
-                <div class="review-header">
-                    <strong>${escapeHtml(review.author)}</strong>
-                    <span>${formatDisplayDate(review.date)}</span>
-                    ${review.rating ? `
-                        <div class="stars">
-                            ${generateStars(review.rating)}
-                        </div>
-                    ` : ''}
-                </div>
-                <div class="review-text">${escapeHtml(review.text)}</div>
-            </div>
-        `).join('');
+        statusDiv.className = 'fetch-status success';
+        statusDiv.innerHTML = `✅ Загружено ${reviews.length} отзывов`;
+        
+        displayReviews(reviews);
+        
+        ratingBlock.style.display = 'flex';
+        sortSelect.style.display = 'block';
+        
+        // Удаляем старый обработчик и добавляем новый
+        sortSelect.removeEventListener('change', window.sortHandler);
+        window.sortHandler = function() {
+            const sorted = sortReviews([...reviews], this.value);
+            renderReviews(sorted);
+        };
+        sortSelect.addEventListener('change', window.sortHandler);
+        
+    } catch (error) {
+        statusDiv.className = 'fetch-status error';
+        statusDiv.innerHTML = `❌ Ошибка: ${error.message}`;
+        console.error('Error loading reviews:', error);
     }
+}
 
-    function sortReviews(reviews, sortBy) {
-        return [...reviews].sort((a, b) => {
-            switch(sortBy) {
-                case 'newest':
-                    return new Date(b.date) - new Date(a.date);
-                case 'oldest':
-                    return new Date(a.date) - new Date(b.date);
-                case 'highest':
-                    return (b.rating || 0) - (a.rating || 0);
-                case 'lowest':
-                    return (a.rating || 0) - (b.rating || 0);
-                default:
-                    return 0;
-            }
-        });
-    }
-
-    function generateStars(rating) {
-        const fullStars = Math.round(rating);
-        let stars = '';
+function displayReviews(reviews) {
+    window.allReviews = reviews;
+    
+    const avgRating = reviews.reduce((sum, r) => sum + (parseFloat(r.rating) || 0), 0) / reviews.length;
+    
+    document.getElementById('avgRating').textContent = avgRating ? avgRating.toFixed(1) : '0.0';
+    document.getElementById('totalReviews').textContent = `${reviews.length} ${getReviewWord(reviews.length)}`;
+    
+    const starsContainer = document.getElementById('starsContainer');
+    starsContainer.innerHTML = '';
+    if (avgRating) {
         for (let i = 1; i <= 5; i++) {
-            stars += i <= fullStars ? '★' : '☆';
-        }
-        return stars;
-    }
-
-    function formatDisplayDate(dateString) {
-        try {
-            const date = new Date(dateString);
-            return date.toLocaleDateString('ru-RU');
-        } catch {
-            return dateString;
+            starsContainer.innerHTML += i <= Math.round(avgRating) ? '★' : '☆';
         }
     }
+    
+    renderReviews(reviews);
+}
 
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+function renderReviews(reviews) {
+    const reviewsList = document.getElementById('reviewsList');
+    
+    if (reviews.length === 0) {
+        reviewsList.innerHTML = '<div class="no-reviews">Нет отзывов</div>';
+        return;
     }
+    
+    reviewsList.innerHTML = reviews.map(review => `
+        <div class="review-card">
+            <div class="review-header">
+                <strong>${escapeHtml(review.author)}</strong>
+                <span>${formatDisplayDate(review.date)}</span>
+                ${review.rating ? `
+                    <div class="stars">
+                        ${generateStars(review.rating)}
+                    </div>
+                ` : ''}
+            </div>
+            <div class="review-text">${escapeHtml(review.text)}</div>
+        </div>
+    `).join('');
+}
 
-    function getReviewWord(count) {
-        if (count % 10 === 1 && count % 100 !== 11) return 'отзыв';
-        if ([2, 3, 4].includes(count % 10) && ![12, 13, 14].includes(count % 100)) return 'отзыва';
-        return 'отзывов';
+function sortReviews(reviews, sortBy) {
+    return [...reviews].sort((a, b) => {
+        switch(sortBy) {
+            case 'newest':
+                return new Date(b.date) - new Date(a.date);
+            case 'oldest':
+                return new Date(a.date) - new Date(b.date);
+            case 'highest':
+                return (parseFloat(b.rating) || 0) - (parseFloat(a.rating) || 0);
+            case 'lowest':
+                return (parseFloat(a.rating) || 0) - (parseFloat(b.rating) || 0);
+            default:
+                return 0;
+        }
+    });
+}
+
+function generateStars(rating) {
+    const fullStars = Math.round(parseFloat(rating));
+    let stars = '';
+    for (let i = 1; i <= 5; i++) {
+        stars += i <= fullStars ? '★' : '☆';
     }
-    </script>
+    return stars;
+}
+
+function formatDisplayDate(dateString) {
+    try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('ru-RU');
+    } catch {
+        return dateString;
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function getReviewWord(count) {
+    if (count % 10 === 1 && count % 100 !== 11) return 'отзыв';
+    if ([2, 3, 4].includes(count % 10) && ![12, 13, 14].includes(count % 100)) return 'отзыва';
+    return 'отзывов';
+}
+</script>
 </body>
 </html>
