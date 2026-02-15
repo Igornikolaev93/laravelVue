@@ -3,31 +3,31 @@
 @section('content')
 <style>
     .campaigns-section {
-        max-width: 600px;
+        max-width: 800px;
         padding: 20px;
-        font-family: 'Mulish', 'Inter', sans-serif;
+        font-family: 'Instrument Sans', sans-serif;
         animation: fadeIn 0.5s ease-out;
     }
     .section-title {
         color: #252733;
-        font-size: 16px;
-        font-weight: 600;
+        font-size: 24px;
+        font-weight: 700;
         margin-bottom: 8px;
     }
     .section-description {
         color: #6C757D;
-        font-size: 12px;
-        font-weight: 600;
-        margin-bottom: 12px;
+        font-size: 14px;
+        font-weight: 400;
+        margin-bottom: 20px;
     }
     .input-wrapper {
         width: 100%;
-        max-width: 480px;
+        max-width: 500px;
         background: white;
         border: 1px solid #DCE4EA;
-        border-radius: 6px;
-        padding: 6px 14px;
-        margin-bottom: 12px;
+        border-radius: 8px;
+        padding: 10px 14px;
+        margin-bottom: 20px;
         transition: border-color 0.3s ease;
     }
     .input-wrapper:focus-within {
@@ -38,8 +38,8 @@
         width: 100%;
         border: none;
         outline: none;
-        color: #788397;
-        font-size: 12px;
+        color: #333;
+        font-size: 14px;
         background: transparent;
         text-decoration: underline;
     }
@@ -47,11 +47,11 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-width: 128px;
-        height: 38px;
-        padding: 0 16px;
+        min-width: 120px;
+        height: 40px;
+        padding: 0 20px;
         border: none;
-        border-radius: 6px;
+        border-radius: 8px;
         font-size: 14px;
         font-weight: 600;
         cursor: pointer;
@@ -74,7 +74,7 @@
 
 <div class="campaigns-section">
     <h2 class="section-title">{{ ($settings && $settings->yandex_maps_url) ? 'Настройки Яндекс.Карт' : 'Подключить Яндекс' }}</h2>
-    <p class="section-description">Укажите ссылку на страницу вашей организации в Яндекс.Картах</p>
+    <p class="section-description">Укажите ссылку на страницу вашей организации в Яндекс, пример</p>
     
     <form action="{{ route('yandex-maps.connect') }}" method="POST">
         @csrf
