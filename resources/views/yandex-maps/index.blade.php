@@ -240,7 +240,6 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     @if($settings && $settings->yandex_maps_url)
-        // Небольшая задержка перед загрузкой
         setTimeout(() => {
             loadReviews('{{ $settings->yandex_maps_url }}');
         }, 100);
@@ -255,14 +254,13 @@ async function loadReviews(url) {
     const statusEl = document.getElementById('status');
     const statsContainer = document.getElementById('statsContainer');
     const sortSelect = document.getElementById('sortSelect');
-    const reviewsList = document.getElementById('reviewsList');
     
     try {
         const response = await fetch('{{ route("yandex-maps.fetch-reviews") }}', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                'X-CSRF-TOKEN': '{{ csrf_token() }}',
                 'Accept': 'application/json',
                 'X-Requested-With': 'XMLHttpRequest'
             },
@@ -271,6 +269,9 @@ async function loadReviews(url) {
         });
 
         if (!response.ok) {
+            if (response.status === 419) {
+                throw new Error('CSRF токен истек. Обновите страницу и попробуйте снова.');
+            }
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.error || `Ошибка HTTP: ${response.status}`);
         }
@@ -283,17 +284,23 @@ async function loadReviews(url) {
             allReviews = data.reviews;
             
             if (data.stats) {
-                displayStats(data.stats);
                 statsContainer.style.display = 'grid';
+                statsContainer.innerHTML = `
+                    <div class="stat-card">
+                        <div class="stat-value">${data.stats.total_reviews || 0}</div>
+                        <div class="stat-label">всего отзывов</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${(data.stats.average_rating || 0).toFixed(1)}</div>
+                        <div class="stat-label">средний рейтинг</div>
+                    </div>
+                `;
             }
             
-            // Показываем первую страницу
             currentPage = 1;
             renderReviewsPage(currentPage);
             
             sortSelect.style.display = 'block';
-            
-            // Обработчик сортировки
             sortSelect.onchange = function() {
                 allReviews = sortReviews([...allReviews], this.value);
                 currentPage = 1;
@@ -301,41 +308,24 @@ async function loadReviews(url) {
             };
             
         } else {
-            reviewsList.innerHTML = '<div class="empty-state">Нет отзывов для отображения</div>';
+            document.getElementById('reviewsList').innerHTML = 
+                '<div class="empty-state">Нет отзывов для отображения</div>';
         }
     } catch (error) {
-        console.error('Error loading reviews:', error);
+        console.error('Error:', error);
         
         statusEl.innerHTML = `
             <div class="error">
                 <i class="fas fa-exclamation-circle"></i> 
-                Ошибка загрузки: ${error.message}
+                ${error.message}
             </div>
         `;
     }
 }
 
-function displayStats(stats) {
-    const container = document.getElementById('statsContainer');
-    if (!container) return;
-    
-    container.innerHTML = `
-        <div class="stat-card">
-            <div class="stat-value">${stats.total_reviews || 0}</div>
-            <div class="stat-label">всего отзывов</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value">${(stats.average_rating || 0).toFixed(1)}</div>
-            <div class="stat-label">средний рейтинг</div>
-        </div>
-    `;
-}
-
 function renderReviewsPage(page) {
     const reviewsList = document.getElementById('reviewsList');
     const paginationDiv = document.getElementById('pagination');
-    
-    if (!reviewsList) return;
     
     if (!allReviews || allReviews.length === 0) {
         reviewsList.innerHTML = '<div class="empty-state">Нет отзывов</div>';
@@ -343,14 +333,12 @@ function renderReviewsPage(page) {
         return;
     }
     
-    // Вычисляем страницы
     const totalPages = Math.ceil(allReviews.length / reviewsPerPage);
     const start = (page - 1) * reviewsPerPage;
     const end = start + reviewsPerPage;
     const pageReviews = allReviews.slice(start, end);
     
-    // Отображаем отзывы текущей страницы
-    const html = pageReviews.map(review => {
+    reviewsList.innerHTML = pageReviews.map(review => {
         const date = new Date(review.date);
         const formattedDate = !isNaN(date) 
             ? date.toLocaleDateString('ru-RU', {
@@ -360,7 +348,7 @@ function renderReviewsPage(page) {
               })
             : review.date;
         
-        const rating = Math.round(review.rating);
+        const rating = Math.min(5, Math.max(0, Math.round(review.rating)));
         const stars = '★'.repeat(rating) + '☆'.repeat(5 - rating);
         
         return `
@@ -379,27 +367,17 @@ function renderReviewsPage(page) {
         `;
     }).join('');
     
-    reviewsList.innerHTML = html;
-    
-    // Создаем пагинацию
     if (totalPages > 1) {
         paginationDiv.style.display = 'flex';
         
         let paginationHtml = '';
         
-        // Кнопка "Предыдущая"
         paginationHtml += `<button onclick="changePage(${page - 1})" ${page === 1 ? 'disabled' : ''}>\n            <i class="fas fa-chevron-left"></i>\n        </button>`;
         
-        // Номера страниц
         for (let i = 1; i <= totalPages; i++) {
-            if (i === page) {
-                paginationHtml += `<button class="active" onclick="changePage(${i})">${i}</button>`;
-            } else {
-                paginationHtml += `<button onclick="changePage(${i})">${i}</button>`;
-            }
+            paginationHtml += `<button onclick="changePage(${i})" ${i === page ? 'class="active"' : ''}>${i}</button>`;
         }
         
-        // Кнопка "Следующая"
         paginationHtml += `<button onclick="changePage(${page + 1})" ${page === totalPages ? 'disabled' : ''}>\n            <i class="fas fa-chevron-right"></i>\n        </button>`;
         
         paginationDiv.innerHTML = paginationHtml;
@@ -418,7 +396,6 @@ function changePage(page) {
     currentPage = page;
     renderReviewsPage(currentPage);
     
-    // Плавный скролл к началу отзывов
     document.getElementById('reviewsList').scrollIntoView({ behavior: 'smooth' });
 }
 
