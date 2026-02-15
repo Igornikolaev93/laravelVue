@@ -256,6 +256,8 @@ async function loadReviews(url) {
     const sortSelect = document.getElementById('sortSelect');
     
     try {
+        statusEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Загрузка отзывов...';
+        
         const response = await fetch('{{ route("yandex-maps.fetch-reviews") }}', {
             method: 'POST',
             headers: {
@@ -268,15 +270,11 @@ async function loadReviews(url) {
             credentials: 'same-origin'
         });
 
-        if (!response.ok) {
-            if (response.status === 419) {
-                throw new Error('CSRF токен истек. Обновите страницу и попробуйте снова.');
-            }
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error || `Ошибка HTTP: ${response.status}`);
-        }
-
         const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || `Ошибка HTTP: ${response.status}`);
+        }
         
         statusEl.style.display = 'none';
         
