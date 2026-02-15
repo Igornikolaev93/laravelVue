@@ -62,7 +62,6 @@ class YandexMapsController extends Controller
             return response()->json(['error' => 'Invalid organization URL'], 400);
         }
 
-        // Получаем информацию об организации через API
         $reviews = $this->fetchYandexApiReviews($orgId);
 
         return response()->json($reviews);
@@ -92,8 +91,7 @@ class YandexMapsController extends Controller
     private function fetchYandexApiReviews($orgId)
     {
         try {
-            // Сначала получаем информацию об организации
-            $response = Http::get('https://search-maps.yandex.ru/v1/', [
+            $response = Http::timeout(15)->get('https://search-maps.yandex.ru/v1/', [
                 'apikey' => $this->apiKey,
                 'text' => $orgId,
                 'type' => 'biz',
@@ -105,13 +103,6 @@ class YandexMapsController extends Controller
                 $data = $response->json();
                 
                 if (isset($data['features'][0])) {
-                    $company = $data['features'][0]['properties']['CompanyMetaData'] ?? [];
-                    
-                    // Здесь мы можем получить основную информацию
-                    Log::info('Company info:', $company);
-                    
-                    // К сожалению, отзывы не доступны через этот API напрямую
-                    // Но мы можем попробовать получить их через другой эндпоинт
                     return $this->fetchReviewsFromYandex($orgId);
                 }
             }
@@ -125,7 +116,6 @@ class YandexMapsController extends Controller
     private function fetchReviewsFromYandex($orgId)
     {
         try {
-            // Пробуем получить отзывы через публичный API
             $endpoints = [
                 "https://yandex.ru/maps/api/organizations/{$orgId}/reviews?lang=ru&pageSize=100",
                 "https://yandex.ru/maps-api/v2/organizations/{$orgId}/reviews?lang=ru_RU&pageSize=100",
@@ -137,7 +127,7 @@ class YandexMapsController extends Controller
                         'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                         'Accept' => 'application/json',
                         'Referer' => 'https://yandex.ru/maps/',
-                    ])->get($endpoint);
+                    ])->timeout(15)->get($endpoint);
 
                     if ($response->successful()) {
                         $data = $response->json();
