@@ -18,23 +18,48 @@ class YandexMapsController extends Controller
             $validated = $request->validate([
                 'yandex_maps_url' => 'required|url',
             ]);
-
-            // Полностью очищаем кеш и старые данные
-            Cache::flush();
             
-            // Обновляем или создаем запись с новым URL и сброшенными данными
-            YandexMapsSetting::updateOrCreate(
-                ['id' => 1],
-                [
-                    'yandex_maps_url' => $validated['yandex_maps_url'],
-                    'rating' => null,
-                    'total_reviews' => 0
-                ]
-            );
-
-            return redirect()->route('yandex-maps.index')->with('success', 'URL saved. Fetching reviews...');
+            // Извлекаем ID организации из URL
+            $orgId = $this->extractOrganizationId($validated['yandex_maps_url']);
+            
+            if (!$orgId) {
+                return back()->with('error', 'Invalid Yandex Maps URL format');
+            }
+            
+            // Используем API Яндекс Карт (требуется API ключ)
+            $apiKey = config('services.yandex_maps.api_key');
+            $client = new Client();
+            
+            try {
+                $response = $client->get("https://search-maps.yandex.ru/v1/", [
+                    'query' => [
+                        'apikey' => $apiKey,
+                        'text' => $orgId,
+                        'lang' => 'ru_RU',
+                        'type' => 'biz'
+                    ]
+                ]);
+                
+                $data = json_decode($response->getBody(), true);
+                
+                // Сохраняем данные в БД
+                YandexMapsSetting::updateOrCreate(
+                    ['id' => 1],
+                    [
+                        'yandex_maps_url' => $validated['yandex_maps_url'],
+                        'rating' => $data['features'][0]['properties']['CompanyMetaData']['rating'] ?? null,
+                        'total_reviews' => $data['features'][0]['properties']['CompanyMetaData']['reviews'] ?? 0
+                    ]
+                );
+                
+                return redirect()->route('yandex-maps.index')->with('success', 'Data fetched successfully');
+                
+            } catch (\Exception $e) {
+                Log::error('Yandex Maps API error: ' . $e->getMessage());
+                return back()->with('error', 'Failed to fetch data from Yandex Maps API');
+            }
         }
-
+        
         $settings = YandexMapsSetting::first();
 
         if (!$settings || !$settings->yandex_maps_url) {
@@ -141,6 +166,14 @@ class YandexMapsController extends Controller
         ]);
     }
     
+    private function extractOrganizationId($url)
+    {
+        // Извлекаем ID организации из URL
+        // Пример: https://yandex.ru/maps/org/.../...
+        preg_match('/org\/([^\/]+)/', $url, $matches);
+        return $matches[1] ?? null;
+    }
+
     private function updateRatingAndReviewsCount($document, $settings)
     {
         try {
