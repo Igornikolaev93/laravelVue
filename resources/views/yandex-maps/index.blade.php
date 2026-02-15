@@ -1,4 +1,4 @@
-('layouts.app')
+@extends('layouts.app')
 
 @section('content')
 <style>
@@ -388,9 +388,7 @@ function renderReviewsPage(page) {
         let paginationHtml = '';
         
         // Кнопка "Предыдущая"
-        paginationHtml += `<button onclick="changePage(${page - 1})" ${page === 1 ? 'disabled' : ''}>
-            <i class="fas fa-chevron-left"></i>
-        </button>`;
+        paginationHtml += `<button onclick="changePage(${page - 1})" ${page === 1 ? 'disabled' : ''}>\n            <i class="fas fa-chevron-left"></i>\n        </button>`;
         
         // Номера страниц
         for (let i = 1; i <= totalPages; i++) {
@@ -402,9 +400,7 @@ function renderReviewsPage(page) {
         }
         
         // Кнопка "Следующая"
-        paginationHtml += `<button onclick="changePage(${page + 1})" ${page === totalPages ? 'disabled' : ''}>
-            <i class="fas fa-chevron-right"></i>
-        </button>`;
+        paginationHtml += `<button onclick="changePage(${page + 1})" ${page === totalPages ? 'disabled' : ''}>\n            <i class="fas fa-chevron-right"></i>\n        </button>`;
         
         paginationDiv.innerHTML = paginationHtml;
     } else {
