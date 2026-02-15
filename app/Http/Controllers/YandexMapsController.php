@@ -13,29 +13,13 @@ class YandexMapsController extends Controller
     
     public function index(Request $request)
     {
-        if ($request->isMethod('post')) {
-            $validated = $request->validate([
-                'yandex_maps_url' => 'required|url',
-            ]);
-
-            YandexMapsSetting::updateOrCreate(
-                ['id' => 1],
-                ['yandex_maps_url' => $validated['yandex_maps_url']]
-            );
-
-            return redirect()->route('yandex-maps.index')->with('success', 'URL saved successfully!');
-        }
-
         $settings = YandexMapsSetting::first();
         
-        if (!$settings || !$settings->yandex_maps_url) {
-            return view('yandex-maps.connect');
-        }
-
         return view('yandex-maps.index', [
             'settings' => $settings
         ]);
     }
+
     public function connect(Request $request)
     {
         $validated = $request->validate([
@@ -62,6 +46,7 @@ class YandexMapsController extends Controller
             return response()->json(['error' => 'Invalid organization URL'], 400);
         }
 
+        // Получаем информацию об организации через API
         $reviews = $this->fetchYandexApiReviews($orgId);
 
         return response()->json($reviews);
@@ -91,6 +76,7 @@ class YandexMapsController extends Controller
     private function fetchYandexApiReviews($orgId)
     {
         try {
+            // Сначала получаем информацию об организации
             $response = Http::timeout(15)->get('https://search-maps.yandex.ru/v1/', [
                 'apikey' => $this->apiKey,
                 'text' => $orgId,
@@ -116,6 +102,7 @@ class YandexMapsController extends Controller
     private function fetchReviewsFromYandex($orgId)
     {
         try {
+            // Пробуем получить отзывы через публичный API
             $endpoints = [
                 "https://yandex.ru/maps/api/organizations/{$orgId}/reviews?lang=ru&pageSize=100",
                 "https://yandex.ru/maps-api/v2/organizations/{$orgId}/reviews?lang=ru_RU&pageSize=100",
