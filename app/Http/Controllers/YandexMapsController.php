@@ -36,6 +36,19 @@ class YandexMapsController extends Controller
             'settings' => $settings
         ]);
     }
+    public function connect(Request $request)
+    {
+        $validated = $request->validate([
+            'yandex_maps_url' => 'required|url',
+        ]);
+
+        YandexMapsSetting::updateOrCreate(
+            ['id' => 1],
+            ['yandex_maps_url' => $validated['yandex_maps_url']]
+        );
+
+        return redirect()->route('yandex-maps.index')->with('success', 'URL saved successfully!');
+    }
 
     public function fetchReviews(Request $request)
     {
