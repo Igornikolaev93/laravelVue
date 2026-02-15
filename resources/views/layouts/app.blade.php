@@ -16,7 +16,13 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
     <!-- Scripts -->
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @php
+        $manifestPath = public_path('build/manifest.json');
+    @endphp
+
+    @if (file_exists($manifestPath))
+        @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @endif
 
 </head>
 <body>
