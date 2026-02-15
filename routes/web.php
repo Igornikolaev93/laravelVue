@@ -1,13 +1,1 @@
-<?php
-
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\YandexMapsController;
-
-Route::get('/', function () {
-    return view('welcome');
-});
-
-Route::get('/yandex-maps', [YandexMapsController::class, 'index'])->name('yandex-maps.index');
-Route::get('/yandex-maps/settings', [YandexMapsController::class, 'settings'])->name('yandex-maps.settings');
-Route::post('/yandex-maps/connect', [YandexMapsController::class, 'connect'])->name('yandex-maps.connect');
-Route::post('/yandex-maps/fetch-reviews', [YandexMapsController::class, 'fetchReviews'])->name('yandex-maps.fetch-reviews');
+<?php\n\nuse Illuminate\\Support\\Facades\\Route;\nuse App\\Http\Controllers\\YandexMapsController;\n\n// Изменяем корневой маршрут на наш контроллер\nRoute::get('/', [YandexMapsController::class, 'index'])->name('home');\n\n// Остальные маршруты\nRoute::get('/yandex-maps', [YandexMapsController::class, 'index'])->name('yandex-maps.index');\nRoute::get('/yandex-maps/settings', [YandexMapsController::class, 'settings'])->name('yandex-maps.settings');\nRoute::post('/yandex-maps/connect', [YandexMapsController::class, 'connect'])->name('yandex-maps.connect');\nRoute::post('/yandex-maps/fetch-reviews', [YandexMapsController::class, 'fetchReviews'])->name('yandex-maps.fetch-reviews');
