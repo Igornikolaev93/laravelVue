@@ -45,23 +45,23 @@ class YandexMapsController extends Controller
     {
         $request->validate(['url' => 'required|url']);
 
-        $orgId = $this->extractOrganizationId($request->url);
+        // Получаем HTML страницы с отзывами
+        $html = $this->fetchPageContent($request->url);
         
-        if (!$orgId) {
+        if (!$html) {
             return response()->json([
                 'success' => false,
-                'error' => 'Не удалось найти ID организации'
-            ], 400);
+                'error' => 'Не удалось загрузить страницу с отзывами'
+            ], 404);
         }
 
-        // Пробуем разные методы получения отзывов
-        $reviews = $this->fetchFromYandex($orgId);
+        // Парсим отзывы из HTML
+        $reviews = $this->parseReviewsFromHtml($html);
 
         if (empty($reviews)) {
             return response()->json([
                 'success' => false,
-                'error' => 'Отзывы не найдены',
-                'reviews' => []
+                'error' => 'Отзывы не найдены на странице'
             ], 404);
         }
 
@@ -74,128 +74,120 @@ class YandexMapsController extends Controller
         ]);
     }
 
-    private function extractOrganizationId($url)
+    private function fetchPageContent($url)
     {
-        // Паттерны для поиска ID в URL Яндекса
-        $patterns = [
-            '/org\/(?:[^\/]+\/)?(\d+)/',
-            '/organization\/(\d+)/',
-            '/maps\/(\d+)/',
-            '/\/(\d{6,})\//',
-            '/reviews\/(\d+)/'
-        ];
-        
-        foreach ($patterns as $pattern) {
-            if (preg_match($pattern, $url, $matches)) {
-                return $matches[1];
+        try {
+            $response = Http::withHeaders([
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language' => 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+                'Cache-Control' => 'no-cache',
+                'Pragma' => 'no-cache'
+            ])->timeout(15)->get($url);
+
+            if ($response->successful()) {
+                return $response->body();
             }
+        } catch (\Exception $e) {
+            Log::error('Error fetching page: ' . $e->getMessage());
         }
-        
+
         return null;
     }
 
-    private function fetchFromYandex($orgId)
-    {
-        // Пробуем разные эндпоинты API
-        $endpoints = [
-            "https://yandex.ru/maps/api/organizations/{$orgId}/reviews?lang=ru&pageSize=50",
-            "https://yandex.ru/maps-api/v2/organizations/{$orgId}/reviews?lang=ru_RU&pageSize=50"
-        ];
-
-        foreach ($endpoints as $endpoint) {
-            try {
-                $response = Http::withHeaders([
-                    'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Accept' => 'application/json',
-                    'Accept-Language' => 'ru-RU,ru;q=0.9',
-                    'Referer' => 'https://yandex.ru/maps/'
-                ])->timeout(10)->get($endpoint);
-
-                if ($response->successful()) {
-                    $data = $response->json();
-                    $reviews = $this->parseReviews($data);
-                    
-                    if (!empty($reviews)) {
-                        Log::info('Got reviews from Yandex', [
-                            'org_id' => $orgId,
-                            'count' => count($reviews)
-                        ]);
-                        return $reviews;
-                    }
-                }
-            } catch (\Exception $e) {
-                Log::warning('Yandex API error', [
-                    'endpoint' => $endpoint,
-                    'error' => $e->getMessage()
-                ]);
-                continue;
-            }
-        }
-
-        return [];
-    }
-
-    private function parseReviews($data)
+    private function parseReviewsFromHtml($html)
     {
         $reviews = [];
         
-        // Ищем отзывы в разных структурах данных
-        $items = $data['reviews'] ?? 
-                $data['data']['reviews'] ?? 
-                $data['items'] ?? 
-                [];
-
-        if (!is_array($items)) {
-            return $reviews;
-        }
-
-        foreach ($items as $item) {
-            $review = [
-                'author' => $this->extractAuthor($item),
-                'date' => $this->extractDate($item),
-                'rating' => $this->extractRating($item),
-                'text' => $this->extractText($item)
-            ];
-
-            // Добавляем только если есть текст
-            if (!empty($review['text']) && strlen($review['text']) > 10) {
-                $reviews[] = $review;
+        // Ищем JSON данные в HTML
+        $pattern = '/<script[^>]*>\s*window\.__INITIAL_STATE__\s*=\s*({.+?});\s*<\/script>/';
+        if (preg_match($pattern, $html, $matches)) {
+            $data = json_decode($matches[1], true);
+            if ($data) {
+                // Ищем отзывы в структуре данных
+                $items = $this->extractReviewsFromData($data);
+                if (!empty($items)) {
+                    return $items;
+                }
             }
         }
 
+        // Если не нашли JSON, ищем отзывы в HTML структуре
+        $reviews = $this->extractReviewsFromHtml($html);
+        
         return $reviews;
     }
 
-    private function extractAuthor($item)
+    private function extractReviewsFromData($data)
     {
-        return $item['author']['name'] ?? 
-               $item['user']['name'] ?? 
-               $item['authorName'] ?? 
-               'Аноним';
+        $reviews = [];
+        
+        // Рекурсивно ищем массив с отзывами
+        array_walk_recursive($data, function($value, $key) use (&$reviews) {
+            if ($key === 'reviews' && is_array($value)) {
+                foreach ($value as $item) {
+                    if (isset($item['text']) && isset($item['author'])) {
+                        $reviews[] = [
+                            'author' => $item['author']['name'] ?? $item['user']['name'] ?? 'Аноним',
+                            'date' => $item['date'] ?? $item['createdAt'] ?? date('Y-m-d'),
+                            'rating' => $item['rating'] ?? $item['stars'] ?? 5,
+                            'text' => $item['text'] ?? $item['comment'] ?? ''
+                        ];
+                    }
+                }
+            }
+        });
+        
+        return $reviews;
     }
 
-    private function extractDate($item)
+    private function extractReviewsFromHtml($html)
     {
-        $date = $item['date'] ?? 
-                $item['createdAt'] ?? 
-                $item['publishDate'] ?? 
-                date('Y-m-d');
-
-        if (is_numeric($date)) {
-            return date('Y-m-d', $date);
+        $reviews = [];
+        
+        // Простой парсинг HTML (можно улучшить)
+        $dom = new \DOMDocument();
+        @$dom->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'));
+        $xpath = new \DOMXPath($dom);
+        
+        // Ищем элементы с классами отзывов
+        $nodes = $xpath->query("//div[contains(@class, 'review')]");
+        
+        foreach ($nodes as $node) {
+            $author = '';
+            $date = '';
+            $rating = 5;
+            $text = '';
+            
+            // Парсим автора
+            $authorNodes = $xpath->query(".//*[contains(@class, 'author')]", $node);
+            if ($authorNodes->length > 0) {
+                $author = trim($authorNodes->item(0)->textContent);
+            }
+            
+            // Парсим дату
+            $dateNodes = $xpath->query(".//*[contains(@class, 'date')]", $node);
+            if ($dateNodes->length > 0) {
+                $date = trim($dateNodes->item(0)->textContent);
+            }
+            
+            // Парсим текст
+            $textNodes = $xpath->query(".//*[contains(@class, 'text')]", $node);
+            if ($textNodes->length > 0) {
+                $text = trim($textNodes->item(0)->textContent);
+            }
+            
+            if (!empty($text)) {
+                $reviews[] = [
+                    'author' => $author ?: 'Аноним',
+                    'date' => $date ?: date('Y-m-d'),
+                    'rating' => $rating,
+                    'text' => $text
+                ];
+            }
         }
-
-        return date('Y-m-d', strtotime($date));
-    }
-
-    private function extractRating($item)
-    {
-        return (int) ($item['rating'] ?? $item['stars'] ?? 0);
-    }
-
-    private function extractText($item)
-    {
-        return trim($item['text'] ?? $item['comment'] ?? '');
+        
+        return $reviews;
     }
 
     private function calculateStats($reviews)

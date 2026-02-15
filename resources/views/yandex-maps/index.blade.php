@@ -279,7 +279,6 @@ async function loadReviews(url) {
         if (data.reviews && data.reviews.length > 0) {
             allReviews = data.reviews;
             
-            // Показываем статистику
             statsContainer.style.display = 'grid';
             statsContainer.innerHTML = `
                 <div class="stat-card">
@@ -304,7 +303,7 @@ async function loadReviews(url) {
             
         } else {
             document.getElementById('reviewsList').innerHTML = 
-                '<div class="empty-state">Нет отзывов для отображения</div>';
+                '<div class="empty-state">На этой странице нет отзывов</div>';
         }
     } catch (error) {
         console.error('Error:', error);
