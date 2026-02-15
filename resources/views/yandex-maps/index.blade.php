@@ -12,6 +12,7 @@
     .alert { padding: 15px; margin-bottom: 20px; border-radius: 4px; }
     .alert-danger { background: #f8d7da; color: #721c24; }
     .alert-success { background: #d4edda; color: #155724; }
+    #loader { text-align: center; padding: 40px; }
 </style>
 
 <div class="reviews-container">
@@ -19,7 +20,7 @@
         <form action="{{ route('yandex-maps.index') }}" method="POST">
             @csrf
             <input type="text" name="yandex_maps_url" class="url-input" placeholder="Enter Yandex Maps URL" value="{{ $settings->yandex_maps_url ?? '' }}" required>
-            <button type="submit" class="submit-button">Fetch Reviews</button>
+            <button type="submit" class="submit-button">Save URL</button>
         </form>
         @if ($errors->any() || session('error'))
             <div class="alert alert-danger">{{ $errors->first() ?? session('error') }}</div>
@@ -30,41 +31,112 @@
     </div>
 
     @if ($settings && $settings->yandex_maps_url)
-        <div class="rating-block">
-            <span class="platform-name">Яндекс Карты</span>
-            <span class="rating-value">
-                {{ is_numeric($settings->rating) ? number_format($settings->rating, 1) : 'N/A' }}
-            </span>
-            @php
-                $ratingValue = is_numeric($settings->rating) ? round((float)$settings->rating) : 0;
-                $ratingValue = max(0, min(5, $ratingValue)); // Ограничиваем от 0 до 5
-            @endphp
-            <div class="stars">{{ str_repeat('★', $ratingValue) . str_repeat('☆', 5 - $ratingValue) }}</div>
-            <span>{{ $settings->total_reviews ?? 0 }} отзывов</span>
-        </div>
-
-        @if(isset($reviews) && $reviews->count() > 0)
-            @foreach ($reviews as $review)
-                <div class="review-card">
-                    <div class="review-header">
-                        <span>{{ $review['author'] }}</span>
-                        <span>{{ $review['date'] }}</span>
-                        @if(!empty($review['rating']) && is_numeric($review['rating']))
-                            @php
-                                $reviewRating = round((float)$review['rating']);
-                                $reviewRating = max(0, min(5, $reviewRating));
-                            @endphp
-                            <div class="stars">{{ str_repeat('★', $reviewRating) . str_repeat('☆', 5 - $reviewRating) }}</div>
-                        @endif
-                    </div>
-                    <div>{{ $review['text'] }}</div>
-                </div>
-            @endforeach
-
-            <div class="pagination-container">{{ $reviews->links() }}</div>
-        @else
-            <div class="review-card">No reviews found for this URL. Please check the URL and try again.</div>
-        @endif
+        <div id="rating-container"></div>
+        <div id="reviews-list"></div>
+        <div id="pagination-container"></div>
+        <div id="loader">Loading reviews...</div>
     @endif
 </div>
-@endsection
+
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const reviewsContainer = document.getElementById('reviews-container');
+        if (reviewsContainer) {
+            fetchReviews();
+        }
+    });
+
+    function fetchReviews(page = 1) {
+        const loader = document.getElementById('loader');
+        const reviewsList = document.getElementById('reviews-list');
+        const ratingContainer = document.getElementById('rating-container');
+        const paginationContainer = document.getElementById('pagination-container');
+
+        loader.style.display = 'block';
+        reviewsList.innerHTML = '';
+
+        fetch(`/api/yandex-maps/reviews?page=${page}`)
+            .then(response => response.json())
+            .then(data => {
+                loader.style.display = 'none';
+                
+                if (data.error) {
+                    reviewsList.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+                    return;
+                }
+
+                updateRating(data.rating, data.total_reviews);
+                renderReviews(data.reviews);
+                renderPagination(data.total_reviews, page);
+            })
+            .catch(error => {
+                loader.style.display = 'none';
+                console.error('Fetch error:', error);
+                reviewsList.innerHTML = `<div class="alert alert-danger">An error occurred while loading reviews.</div>`;
+            });
+    }
+
+    function updateRating(rating, totalReviews) {
+        const ratingContainer = document.getElementById('rating-container');
+        const ratingValue = parseFloat(rating);
+        const stars = '★'.repeat(Math.round(ratingValue)) + '☆'.repeat(5 - Math.round(ratingValue));
+        ratingContainer.innerHTML = `
+            <div class="rating-block">
+                <span class="platform-name">Яндекс Карты</span>
+                <span class="rating-value">${ratingValue.toFixed(1)}</span>
+                <div class="stars">${stars}</div>
+                <span>${totalReviews} отзывов</span>
+            </div>
+        `;
+    }
+
+    function renderReviews(reviews) {
+        const reviewsList = document.getElementById('reviews-list');
+        if (reviews.length === 0) {
+            reviewsList.innerHTML = '<div class="review-card">No reviews found.</div>';
+            return;
+        }
+
+        let html = '';
+        reviews.forEach(review => {
+            const stars = review.rating ? '★'.repeat(Math.round(review.rating)) + '☆'.repeat(5 - Math.round(review.rating)) : '';
+            html += `
+                <div class="review-card">
+                    <div class="review-header">
+                        <span>${review.author}</span>
+                        <span>${review.date}</span>
+                        <div class="stars">${stars}</div>
+                    </div>
+                    <div>${review.text}</div>
+                </div>
+            `;
+        });
+        reviewsList.innerHTML = html;
+    }
+
+    function renderPagination(total, currentPage) {
+        const paginationContainer = document.getElementById('pagination-container');
+        const totalPages = Math.ceil(total / 5);
+        if (totalPages <= 1) {
+            paginationContainer.innerHTML = '';
+            return;
+        }
+
+        let html = '<nav><ul class="pagination">';
+        for (let i = 1; i <= totalPages; i++) {
+            html += `<li class="page-item ${i === currentPage ? 'active' : ''}"><a class="page-link" href="#" data-page="${i}">${i}</a></li>`;
+        }
+        html += '</ul></nav>';
+        paginationContainer.innerHTML = html;
+
+        document.querySelectorAll('.page-link').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const page = this.getAttribute('data-page');
+                fetchReviews(page);
+            });
+        });
+    }
+</script>
+@endpush

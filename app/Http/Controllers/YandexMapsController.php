@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\YandexMapsSetting;
 use Illuminate\Http\Request;
-use Illuminate\Pagination\LengthAwarePaginator;
 use GuzzleHttp\Client;
 use Illuminate\Support\Facades\Log;
 
@@ -17,18 +16,13 @@ class YandexMapsController extends Controller
                 'yandex_maps_url' => 'required|url',
             ]);
 
-            $settings = YandexMapsSetting::updateOrCreate(
+            YandexMapsSetting::updateOrCreate(
                 ['id' => 1],
                 ['yandex_maps_url' => $validated['yandex_maps_url']]
             );
 
-            $orgId = $this->extractOrganizationId($validated['yandex_maps_url']);
-            
-            if ($orgId) {
-                $this->fetchReviewsAndRating($orgId, $settings);
-            }
-
-            return redirect()->route('yandex-maps.index')->with('success', 'Data fetched successfully!');
+            return redirect()->route('yandex-maps.index')
+                ->with('success', 'URL saved. Loading reviews...');
         }
 
         $settings = YandexMapsSetting::first();
@@ -37,26 +31,25 @@ class YandexMapsController extends Controller
             return view('yandex-maps.connect');
         }
 
-        $reviews = session('yandex_reviews', []);
-        
-        $perPage = 5;
-        $currentPage = $request->get('page', 1);
-        $paginatedReviews = new LengthAwarePaginator(
-            array_slice($reviews, ($currentPage - 1) * $perPage, $perPage),
-            count($reviews),
-            $perPage,
-            $currentPage,
-            ['path' => $request->url(), 'query' => $request->query()]
-        );
-
         return view('yandex-maps.index', [
-            'settings' => $settings,
-            'reviews' => $paginatedReviews
+            'settings' => $settings
         ]);
     }
 
-    private function fetchReviewsAndRating($orgId, $settings)
+    public function fetchReviews(Request $request)
     {
+        $settings = YandexMapsSetting::first();
+
+        if (!$settings || !$settings->yandex_maps_url) {
+            return response()->json(['error' => 'Yandex Maps URL not set.'], 400);
+        }
+
+        $orgId = $this->extractOrganizationId($settings->yandex_maps_url);
+
+        if (!$orgId) {
+            return response()->json(['error' => 'Invalid Yandex Maps URL format.'], 400);
+        }
+
         $client = new Client([
             'headers' => [
                 'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -67,59 +60,61 @@ class YandexMapsController extends Controller
         ]);
 
         try {
-            // Получаем отзывы через неофициальный API Яндекс Карт
             $response = $client->get("https://yandex.ru/maps/api/organizations/{$orgId}/reviews", [
                 'query' => [
                     'lang' => 'ru_RU',
-                    'page' => 1,
-                    'pageSize' => 20,
+                    'page' => $request->get('page', 1),
+                    'pageSize' => 5,
                     'sortBy' => 'date'
                 ]
             ]);
             
             $data = json_decode($response->getBody(), true);
-            
-            if (isset($data['reviews']) && is_array($data['reviews'])) {
-                $reviews = [];
-                foreach ($data['reviews'] as $item) {
-                    // Извлекаем текст отзыва
-                    $text = '';
-                    if (isset($item['text'])) {
-                        $text = $item['text'];
-                    } elseif (isset($item['pros'])) {
-                        $text = $item['pros'];
-                        if (isset($item['cons'])) {
-                            $text .= ' ' . $item['cons'];
-                        }
-                    }
-                    
-                    $reviews[] = [
-                        'author' => $item['author']['name'] ?? $item['user']['name'] ?? 'Аноним',
-                        'date' => date('Y-m-d', strtotime($item['date'] ?? $item['createdAt'] ?? 'now')),
-                        'rating' => $item['rating'] ?? $item['stars'] ?? null,
-                        'text' => trim($text)
-                    ];
-                }
-                
-                session(['yandex_reviews' => $reviews]);
+
+            if (!isset($data['reviews']) || !is_array($data['reviews'])) {
+                return response()->json(['error' => 'No reviews found.'], 404);
             }
             
-            // Обновляем рейтинг и количество
+            $reviews = [];
+            foreach ($data['reviews'] as $item) {
+                $text = '';
+                if (isset($item['text'])) {
+                    $text = $item['text'];
+                } elseif (isset($item['pros'])) {
+                    $text = $item['pros'];
+                    if (isset($item['cons'])) {
+                        $text .= ' ' . $item['cons'];
+                    }
+                }
+                
+                $reviews[] = [
+                    'author' => $item['author']['name'] ?? $item['user']['name'] ?? 'Аноним',
+                    'date' => date('Y-m-d', strtotime($item['date'] ?? $item['createdAt'] ?? 'now')),
+                    'rating' => $item['rating'] ?? $item['stars'] ?? null,
+                    'text' => trim($text)
+                ];
+            }
+
             if (isset($data['rating'])) {
                 $settings->rating = $data['rating'];
                 $settings->total_reviews = $data['total'] ?? count($data['reviews'] ?? []);
                 $settings->save();
             }
             
+            return response()->json([
+                'reviews' => $reviews,
+                'total_reviews' => $data['total'] ?? 0,
+                'rating' => $data['rating'] ?? 0
+            ]);
+
         } catch (\Exception $e) {
             Log::error('Yandex Maps API error: ' . $e->getMessage());
-            session(['yandex_reviews' => []]);
+            return response()->json(['error' => 'Failed to fetch reviews.'], 500);
         }
     }
 
     private function extractOrganizationId($url)
     {
-        // Ищем ID организации в разных форматах URL
         $patterns = [
             '/\/org\/(?:[^\/]+\/)?(\d+)/',
             '/organization\/(\d+)/',

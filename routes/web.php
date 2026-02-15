@@ -1,9 +1,10 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\YandexMapsController;
 
 Route::get('/', function () {
     return redirect()->route('yandex-maps.index');
 });
 
-require __DIR__.'/yandex-maps.php';
+Route::match(['get', 'post'], '/yandex-maps', [YandexMapsController::class, 'index'])->name('yandex-maps.index');
