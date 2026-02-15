@@ -64,12 +64,16 @@
         color: #252733;
         font-size: 16px;
         font-weight: 600;
+        line-height: 20px;
+        letter-spacing: 0.2px;
         margin-bottom: 8px;
     }
     .section-description {
         color: #6C757D;
         font-size: 12px;
         font-weight: 600;
+        line-height: 20px;
+        letter-spacing: 0.2px;
         margin-bottom: 12px;
     }
     .input-wrapper {
@@ -92,9 +96,14 @@
         outline: none;
         color: #788397;
         font-size: 12px;
-        font-family: 'Mulish', sans-serif;
+        font-family: 'Mulish', 'sans-serif';
+        font-weight: 400;
         text-decoration: underline;
         background: transparent;
+    }
+    .url-input[readonly] {
+        cursor: default;
+        opacity: 0.9;
     }
     .btn {
         display: inline-flex;
@@ -111,6 +120,7 @@
         cursor: pointer;
         transition: all 0.3s ease;
         text-align: center;
+        white-space: nowrap;
     }
     .btn-primary {
         background: #339AF0;
@@ -126,16 +136,123 @@
         transform: translateY(0);
         box-shadow: none;
     }
+    .btn-primary:focus-visible {
+        outline: 2px solid #339AF0;
+        outline-offset: 2px;
+    }
 
     @keyframes fadeIn {
         from { opacity: 0; transform: translateY(-10px); }
         to { opacity: 1; transform: translateY(0); }
     }
 
+    /* --- ADAPTIVE STYLES --- */
+    @media (max-width: 768px) {
+        .campaigns-section {
+            padding: 16px;
+        }
+        
+        .input-wrapper {
+            max-width: 100%;
+        }
+        
+        .btn {
+            width: 100%;
+            max-width: 128px;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .btn {
+            max-width: 100%;
+            width: 100%;
+        }
+        
+        .url-input {
+            font-size: 11px;
+        }
+        
+        .review-card-new {
+            padding: 15px;
+        }
+        
+        .review-card-new-header {
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+    }
+
+    @media (max-width: 320px) {
+        .section-title {
+            font-size: 14px;
+        }
+        
+        .section-description {
+            font-size: 11px;
+        }
+    }
+
+    /* --- UTILITY CLASSES --- */
+    .url-display {
+        width: 471px;
+        color: #788397;
+        font-size: 12px;
+        font-family: 'Mulish', 'sans-serif';
+        font-weight: 400;
+        text-decoration: underline;
+        word-wrap: break-word;
+        margin-top: 8px;
+    }
+
+    .hidden {
+        display: none;
+    }
+
+    /* --- ACCESSIBILITY --- */
     @media (prefers-reduced-motion: reduce) {
-        .btn, .input-wrapper, .campaigns-section, .review-card-new {
+        .btn,
+        .input-wrapper,
+        .campaigns-section,
+        .review-card-new {
             transition: none;
             animation: none;
+        }
+    }
+
+    /* --- DARK THEME (OPTIONAL) --- */
+    @media (prefers-color-scheme: dark) {
+        .input-wrapper {
+            background: #2d2d2d;
+            border-color: #404040;
+        }
+        
+        .url-input {
+            color: #a0a0a0;
+        }
+        
+        .section-title {
+            color: #e0e0e0;
+        }
+        
+        .section-description {
+            color: #b0b0b0;
+        }
+    }
+
+    /* --- PRINT STYLES --- */
+    @media print {
+        .btn {
+            display: none;
+        }
+        
+        .input-wrapper {
+            border: 1px solid #000;
+            background: none;
+        }
+        
+        .url-input {
+            color: #000;
+            text-decoration: none;
         }
     }
 </style>
@@ -171,7 +288,10 @@
                     body: JSON.stringify({ url })
                 });
                 
-                if (!response.ok) throw new Error((await response.json()).error || 'Ошибка при загрузке отзывов');
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Ошибка при загрузке отзывов');
+                }
                 
                 const reviews = await response.json();
                 statusDiv.style.display = 'none';
@@ -179,43 +299,89 @@
                 
             } catch (error) {
                 statusDiv.textContent = `❌ Ошибка: ${error.message}`;
+                console.error('Error loading reviews:', error);
             }
         }
 
         function renderReviews(reviews) {
             const reviewsList = document.getElementById('reviewsList');
-            if (reviews.length === 0) {
+            if (!reviews || reviews.length === 0) {
                 reviewsList.innerHTML = '<div class="no-reviews">Нет отзывов для отображения.</div>';
                 return;
             }
-            reviewsList.innerHTML = reviews.map(review => `
-                <div class="review-card-new">
-                    <div class="review-card-new-header">
-                        <span>${new Intl.DateTimeFormat('ru-RU', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(review.date))}</span>
-                        <span class="branch">филиал 1</span>
-                        <span class="icon"><i class="fas fa-map-marker-alt"></i></span>
+            
+            reviewsList.innerHTML = reviews.map(review => {
+                const date = review.date ? new Date(review.date) : new Date();
+                const formattedDate = !isNaN(date) ? 
+                    new Intl.DateTimeFormat('ru-RU', { 
+                        year: 'numeric', 
+                        month: '2-digit', 
+                        day: '2-digit', 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                    }).format(date) : 'Дата не указана';
+                
+                return `
+                    <div class="review-card-new">
+                        <div class="review-card-new-header">
+                            <span>${formattedDate}</span>
+                            <span class="branch">филиал 1</span>
+                            <span class="icon"><i class="fas fa-map-marker-alt"></i></span>
+                        </div>
+                        <div class="review-card-new-author">
+                            <strong>${escapeHtml(review.author || 'Аноним')}</strong>
+                        </div>
+                        <div class="review-card-new-text">
+                            ${escapeHtml(review.text || 'Нет текста отзыва')}
+                        </div>
                     </div>
-                    <div class="review-card-new-author"><strong>${review.author || 'Аноним'}</strong></div>
-                    <div class="review-card-new-text">${review.text || ''}</div>
-                </div>`).join('');
+                `;
+            }).join('');
+        }
+
+        // Helper function to escape HTML
+        function escapeHtml(unsafe) {
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
         }
     </script>
 @else
-    <form action="{{ route('yandex-maps.connect') }}" method="POST" class="campaigns-section">
-        @csrf
+    <div class="campaigns-section">
         <h2 class="section-title">Подключить Яндекс</h2>
-        <p class="section-description">Укажите ссылку на Яндекс, пример</p>
-        <div class="input-wrapper">
-            <input 
-                type="url" 
-                name="yandex_maps_url"
-                class="url-input" 
-                value="https://yandex.ru/maps/org/samoye_populyarnoye_kafe/1010501395/reviews/"
-                required
-            >
+        <p class="section-description">Укажите ссылку на Яндекс.Карты с отзывами</p>
+        
+        <form action="{{ route('yandex-maps.connect') }}" method="POST">
+            @csrf
+            <div class="input-wrapper">
+                <input 
+                    type="url" 
+                    name="yandex_maps_url"
+                    class="url-input" 
+                    value="https://yandex.ru/maps/org/samoye_populyarnoye_kafe/1010501395/reviews/"
+                    placeholder="https://yandex.ru/maps/org/..."
+                    required
+                >
+            </div>
+            
+            @error('yandex_maps_url')
+                <div style="color: #EF4444; font-size: 12px; margin-bottom: 10px;">
+                    {{ $message }}
+                </div>
+            @enderror
+            
+            <button type="submit" class="btn btn-primary">
+                Сохранить
+            </button>
+        </form>
+        
+        <div class="url-display hidden">
+            https://yandex.ru/maps/org/samoye_populyarnoye_kafe/1010501395/reviews/
         </div>
-        <button type="submit" class="btn btn-primary">Сохранить</button>
-    </form>
+    </div>
 @endif
 
 @endsection
