@@ -3,56 +3,63 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-
-    <!-- CSRF Token -->
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-
     <title>{{ config('app.name', 'Laravel') }}</title>
-
     <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Styles -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-
-    <!-- Scripts -->
-    @php
-        $manifestPath = public_path('build/manifest.json');
-    @endphp
-
-    @if (file_exists($manifestPath))
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
-    @endif
-
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: #f4f6f9;
+            color: #2c3e50;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px;
+        }
+        .main-header {
+            background-color: #ffffff;
+            padding: 20px 30px;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .main-header .logo {
+            font-size: 24px;
+            font-weight: 700;
+            color: #3490dc;
+            text-decoration: none;
+        }
+        .main-nav a {
+            margin-left: 20px;
+            text-decoration: none;
+            color: #555;
+            font-weight: 600;
+        }
+        .main-content {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+    </style>
 </head>
 <body>
-    <div id="app">
-        <!-- Navigation Menu -->
-        <div class="navigation-menu">
-            <div class="nav-logo">
-                <div style="color: #363740; font-size: 20px; font-weight: 700;">Daily Grow</div>
-            </div>
-            
-            <ul class="nav-items">
-                <li class="nav-item">
-                    <a href="{{ route('yandex-maps.index') }}" class="nav-link {{ request()->routeIs('yandex-maps.index') ? 'active' : '' }}">
-                        <span class="nav-icon"><i class="fas fa-star"></i></span>
-                        <span>Отзывы</span>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="{{ route('yandex-maps.settings') }}" class="nav-link {{ request()->routeIs('yandex-maps.settings') ? 'active' : '' }}">
-                        <span class="nav-icon"><i class="fas fa-cog"></i></span>
-                        <span>Настройка</span>
-                    </a>
-                </li>
-            </ul>
-        </div>
+    <header class="main-header">
+        <a href="{{ url('/') }}" class="logo">{{ config('app.name', 'Laravel') }}</a>
+        <nav class="main-nav">
+            <a href="{{ route('home') }}">Отзывы</a>
+            <a href="{{ route('yandex-maps.settings') }}">Настройки</a>
+        </nav>
+    </header>
 
-        <!-- Main Content -->
-        <main class="main-content">
-            @yield('content')
-        </main>
-    </div>
+    <main class="container">
+        @yield('content')
+    </main>
 </body>
 </html>

@@ -2,98 +2,92 @@
 
 @section('content')
 <style>
-    .campaigns-section {
-        max-width: 800px;
-        padding: 20px;
-        font-family: 'Instrument Sans', sans-serif;
-        animation: fadeIn 0.5s ease-out;
+    .settings-form {
+        max-width: 600px;
+        margin: 0 auto;
+        background: #fff;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
     }
-    .section-title {
-        color: #252733;
-        font-size: 24px;
-        font-weight: 700;
-        margin-bottom: 8px;
+    .form-group {
+        margin-bottom: 25px;
     }
-    .section-description {
-        color: #6C757D;
-        font-size: 14px;
-        font-weight: 400;
-        margin-bottom: 20px;
-    }
-    .input-wrapper {
-        width: 100%;
-        max-width: 500px;
-        background: white;
-        border: 1px solid #DCE4EA;
-        border-radius: 8px;
-        padding: 10px 14px;
-        margin-bottom: 20px;
-        transition: border-color 0.3s ease;
-    }
-    .input-wrapper:focus-within {
-        border-color: #339AF0;
-        box-shadow: 0 0 0 2px rgba(51, 154, 240, 0.1);
-    }
-    .url-input {
-        width: 100%;
-        border: none;
-        outline: none;
-        color: #333;
-        font-size: 14px;
-        background: transparent;
-        text-decoration: underline;
-    }
-    .btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 120px;
-        height: 40px;
-        padding: 0 20px;
-        border: none;
-        border-radius: 8px;
-        font-size: 14px;
+    .form-label {
+        display: block;
+        margin-bottom: 10px;
         font-weight: 600;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        text-align: center;
+        color: #333;
+    }
+    .form-control {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        transition: border-color 0.2s;
+    }
+    .form-control:focus {
+        outline: none;
+        border-color: #3490dc;
     }
     .btn-primary {
-        background: #339AF0;
+        padding: 12px 25px;
+        background-color: #3490dc;
         color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background-color 0.2s;
     }
     .btn-primary:hover {
-        background: #2b8ad4;
+        background-color: #2779bd;
     }
-
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(-10px); }
-        to { opacity: 1; transform: translateY(0); }
+    .alert {
+        padding: 15px;
+        margin-bottom: 20px;
+        border-radius: 8px;
+    }
+    .alert-success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    .alert-error {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
     }
 </style>
 
-<div class="campaigns-section">
-    <h2 class="section-title">{{ ($settings && $settings->yandex_maps_url) ? 'Настройки Яндекс.Карт' : 'Подключить Яндекс' }}</h2>
-    <p class="section-description">Укажите ссылку на страницу вашей организации в Яндекс, пример</p>
-    
+<div class="settings-form">
+    <h3 style="text-align: center; margin-bottom: 30px;">Настройки Яндекс.Карт</h3>
+
+    @if (session('success'))
+        <div class="alert alert-success">
+            {{ session('success') }}
+        </div>
+    @endif
+
+    @if (session('error'))
+        <div class="alert alert-error">
+            {{ session('error') }}
+        </div>
+    @endif
+
     <form action="{{ route('yandex-maps.connect') }}" method="POST">
         @csrf
-        <div class="input-wrapper">
-            <input 
-                type="url" 
-                name="yandex_maps_url"
-                class="url-input" 
-                value="{{ ($settings && $settings->yandex_maps_url) ? $settings->yandex_maps_url : 'https://yandex.ru/maps/org/samoye_populyarnoye_kafe/1010501395/reviews/' }}"
-                placeholder="https://yandex.ru/maps/org/..."
-                required
-            >
+        <div class="form-group">
+            <label for="yandex_maps_url" class="form-label">URL организации на Яндекс.Картах</label>
+            <input type="text" name="yandex_maps_url" id="yandex_maps_url" class="form-control" 
+                   placeholder="https://yandex.ru/maps/org/...." 
+                   value="{{ old('yandex_maps_url', $settings->yandex_maps_url ?? '') }}">
+            @error('yandex_maps_url')
+                <div style="color: #e3342f; font-size: 14px; margin-top: 5px;">{{ $message }}</div>
+            @enderror
         </div>
-        @error('yandex_maps_url')
-            <div style="color: #EF4444; font-size: 12px; margin-bottom: 10px;">{{ $message }}</div>
-        @enderror
-        <button type="submit" class="btn btn-primary">
-            {{ ($settings && $settings->yandex_maps_url) ? 'Обновить' : 'Сохранить' }}
-        </button>
+        <div style="text-align: center;">
+            <button type="submit" class="btn btn-primary">Сохранить</button>
+        </div>
     </form>
 </div>
 @endsection
