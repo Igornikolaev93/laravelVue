@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\YandexMapsSetting;
 use Illuminate\Http\Request;
-use GuzzleHttp\Client;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Log;
 
 class YandexMapsController extends Controller
@@ -21,8 +21,13 @@ class YandexMapsController extends Controller
                 ['yandex_maps_url' => $validated['yandex_maps_url']]
             );
 
-            return redirect()->route('yandex-maps.index')
-                ->with('success', 'URL saved. Loading reviews...');
+            // Fetch reviews using the API method
+            $reviews = $this->fetchReviewsFromApi($validated['yandex_maps_url']);
+            
+            // Save reviews to the session
+            session(['yandex_reviews' => $reviews]);
+
+            return redirect()->route('yandex-maps.index')->with('success', 'URL saved and reviews fetched successfully!');
         }
 
         $settings = YandexMapsSetting::first();
@@ -31,86 +36,89 @@ class YandexMapsController extends Controller
             return view('yandex-maps.connect');
         }
 
+        // Get reviews from the session
+        $reviews = session('yandex_reviews', []);
+        
+        // Paginate the reviews
+        $perPage = 5;
+        $currentPage = $request->get('page', 1);
+        $paginatedReviews = new LengthAwarePaginator(
+            array_slice($reviews, ($currentPage - 1) * $perPage, $perPage),
+            count($reviews),
+            $perPage,
+            $currentPage,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+
         return view('yandex-maps.index', [
-            'settings' => $settings
+            'settings' => $settings,
+            'reviews' => $paginatedReviews
         ]);
     }
 
-    public function fetchReviews(Request $request)
+    private function fetchReviewsFromApi($url)
     {
-        $settings = YandexMapsSetting::first();
-
-        if (!$settings || !$settings->yandex_maps_url) {
-            return response()->json(['error' => 'Yandex Maps URL not set.'], 400);
-        }
-
-        $orgId = $this->extractOrganizationId($settings->yandex_maps_url);
-
+        $orgId = $this->extractOrganizationId($url);
+        
         if (!$orgId) {
-            return response()->json(['error' => 'Invalid Yandex Maps URL format.'], 400);
+            return [];
         }
 
-        $client = new Client([
+        $client = new \GuzzleHttp\Client([
             'headers' => [
                 'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                 'Accept' => 'application/json',
-                'Accept-Language' => 'ru-RU,ru;q=0.9'
             ],
-            'timeout' => 15
+            'timeout'  => 10,
         ]);
 
         try {
-            $response = $client->get("https://yandex.ru/maps/api/organizations/{$orgId}/reviews", [
-                'query' => [
-                    'lang' => 'ru_RU',
-                    'page' => $request->get('page', 1),
-                    'pageSize' => 5,
-                    'sortBy' => 'date'
-                ]
-            ]);
-            
-            $data = json_decode($response->getBody(), true);
+            // Try various API endpoints
+            $endpoints = [
+                "https://yandex.ru/maps/api/organizations/{$orgId}/reviews?lang=ru&page=1&pageSize=50",
+                "https://yandex.ru/maps-api/v2/organizations/{$orgId}/reviews?lang=ru_RU&pageSize=50",
+            ];
 
-            if (!isset($data['reviews']) || !is_array($data['reviews'])) {
-                return response()->json(['error' => 'No reviews found.'], 404);
-            }
-            
-            $reviews = [];
-            foreach ($data['reviews'] as $item) {
-                $text = '';
-                if (isset($item['text'])) {
-                    $text = $item['text'];
-                } elseif (isset($item['pros'])) {
-                    $text = $item['pros'];
-                    if (isset($item['cons'])) {
-                        $text .= ' ' . $item['cons'];
+            foreach ($endpoints as $endpoint) {
+                try {
+                    $response = $client->get($endpoint);
+                    $data = json_decode($response->getBody(), true);
+                    
+                    $parsedReviews = $this->parseApiResponse($data);
+                    
+                    if (!empty($parsedReviews)) {
+                        return $parsedReviews;
                     }
+                } catch (\Exception $e) {
+                    Log::warning("API endpoint failed: {$endpoint}. Error: " . $e->getMessage());
+                    continue;
                 }
-                
+            }
+        } catch (\Exception $e) {
+            Log::error('API fetch error: ' . $e->getMessage());
+        }
+
+        return [];
+    }
+
+    private function parseApiResponse($data)
+    {
+        $reviews = [];
+        
+        $reviewItems = $data['reviews'] ?? $data['data']['reviews'] ?? [];
+
+        if (is_array($reviewItems)) {
+            foreach ($reviewItems as $item) {
                 $reviews[] = [
                     'author' => $item['author']['name'] ?? $item['user']['name'] ?? 'Аноним',
-                    'date' => date('Y-m-d', strtotime($item['date'] ?? $item['createdAt'] ?? 'now')),
+                    'date' => isset($item['date']) ? date('Y-m-d', strtotime($item['date'])) : (isset($item['createdAt']) ? date('Y-m-d', strtotime($item['createdAt'])) : date('Y-m-d')),
                     'rating' => $item['rating'] ?? $item['stars'] ?? null,
-                    'text' => trim($text)
+                    'text' => $item['text'] ?? $item['comment'] ?? ''
                 ];
             }
-
-            if (isset($data['rating'])) {
-                $settings->rating = $data['rating'];
-                $settings->total_reviews = $data['total'] ?? count($data['reviews'] ?? []);
-                $settings->save();
-            }
-            
-            return response()->json([
-                'reviews' => $reviews,
-                'total_reviews' => $data['total'] ?? 0,
-                'rating' => $data['rating'] ?? 0
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Yandex Maps API error: ' . $e->getMessage());
-            return response()->json(['error' => 'Failed to fetch reviews.'], 500);
         }
+        
+        return $reviews;
     }
 
     private function extractOrganizationId($url)
@@ -119,7 +127,8 @@ class YandexMapsController extends Controller
             '/\/org\/(?:[^\/]+\/)?(\d+)/',
             '/organization\/(\d+)/',
             '/maps\/(\d+)/',
-            '/biz\/(\d+)/'
+            '/biz\/(\d+)/',
+            '/\/(\d{5,})\/reviews/'
         ];
         
         foreach ($patterns as $pattern) {
