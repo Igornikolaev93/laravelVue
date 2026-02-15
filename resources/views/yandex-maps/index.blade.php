@@ -88,6 +88,22 @@
         color: #2c3e50;
         line-height: 1.6;
         font-size: 14px;
+        max-height: 150px;
+        overflow-y: auto;
+        padding-right: 10px;
+    }
+    
+    .review-text::-webkit-scrollbar {
+        width: 4px;
+    }
+    
+    .review-text::-webkit-scrollbar-track {
+        background: #f1f1f1;
+    }
+    
+    .review-text::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
     }
     
     .loading {
@@ -161,6 +177,32 @@
         outline: none;
         border-color: #667eea;
     }
+    
+    .pagination {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-top: 30px;
+    }
+    
+    .pagination button {
+        padding: 8px 16px;
+        border: 1px solid #dee2e6;
+        background: white;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .pagination button:hover {
+        background: #e9ecef;
+    }
+    
+    .pagination button.active {
+        background: #667eea;
+        color: white;
+        border-color: #667eea;
+    }
 </style>
 
 @if($settings && $settings->yandex_maps_url)
@@ -185,6 +227,8 @@
     </select>
     
     <div id="reviewsList" class="reviews-grid"></div>
+    
+    <div id="pagination" class="pagination" style="display: none;"></div>
 @else
     <div class="empty-state">
         <i class="fas fa-map-marked-alt"></i>
@@ -196,76 +240,128 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     @if($settings && $settings->yandex_maps_url)
-        loadReviews('{{ $settings->yandex_maps_url }}');
+        // Небольшая задержка перед загрузкой
+        setTimeout(() => {
+            loadReviews('{{ $settings->yandex_maps_url }}');
+        }, 100);
     @endif
 });
 
 let allReviews = [];
+let currentPage = 1;
+const reviewsPerPage = 6;
 
 async function loadReviews(url) {
+    const statusEl = document.getElementById('status');
+    const statsContainer = document.getElementById('statsContainer');
+    const sortSelect = document.getElementById('sortSelect');
+    const reviewsList = document.getElementById('reviewsList');
+    
     try {
         const response = await fetch('{{ route("yandex-maps.fetch-reviews") }}', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
             },
-            body: JSON.stringify({ url })
+            body: JSON.stringify({ url }),
+            credentials: 'same-origin'
         });
 
-        const data = await response.json();
-
         if (!response.ok) {
-            throw new Error(data.error || 'Ошибка загрузки');
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || `Ошибка HTTP: ${response.status}`);
         }
 
-        document.getElementById('status').style.display = 'none';
+        const data = await response.json();
+        
+        statusEl.style.display = 'none';
         
         if (data.reviews && data.reviews.length > 0) {
             allReviews = data.reviews;
-            displayStats(data.stats);
-            renderReviews(allReviews);
             
-            document.getElementById('sortSelect').style.display = 'block';
-            document.getElementById('sortSelect').addEventListener('change', function() {
-                const sorted = sortReviews([...allReviews], this.value);
-                renderReviews(sorted);
-            });
+            if (data.stats) {
+                displayStats(data.stats);
+                statsContainer.style.display = 'grid';
+            }
+            
+            // Показываем первую страницу
+            currentPage = 1;
+            renderReviewsPage(currentPage);
+            
+            sortSelect.style.display = 'block';
+            
+            // Обработчик сортировки
+            sortSelect.onchange = function() {
+                allReviews = sortReviews([...allReviews], this.value);
+                currentPage = 1;
+                renderReviewsPage(currentPage);
+            };
+            
         } else {
-            document.getElementById('reviewsList').innerHTML = 
-                '<div class="empty-state">Нет отзывов для отображения</div>';
+            reviewsList.innerHTML = '<div class="empty-state">Нет отзывов для отображения</div>';
         }
     } catch (error) {
-        document.getElementById('status').innerHTML = 
-            `<div class="error"><i class="fas fa-exclamation-circle"></i> ${error.message}</div>`;
+        console.error('Error loading reviews:', error);
+        
+        statusEl.innerHTML = `
+            <div class="error">
+                <i class="fas fa-exclamation-circle"></i> 
+                Ошибка загрузки: ${error.message}
+            </div>
+        `;
     }
 }
 
 function displayStats(stats) {
     const container = document.getElementById('statsContainer');
-    container.style.display = 'grid';
+    if (!container) return;
+    
     container.innerHTML = `
         <div class="stat-card">
-            <div class="stat-value">${stats.total_reviews}</div>
+            <div class="stat-value">${stats.total_reviews || 0}</div>
             <div class="stat-label">всего отзывов</div>
         </div>
         <div class="stat-card">
-            <div class="stat-value">${stats.average_rating}</div>
+            <div class="stat-value">${(stats.average_rating || 0).toFixed(1)}</div>
             <div class="stat-label">средний рейтинг</div>
         </div>
     `;
 }
 
-function renderReviews(reviews) {
-    const html = reviews.map(review => {
+function renderReviewsPage(page) {
+    const reviewsList = document.getElementById('reviewsList');
+    const paginationDiv = document.getElementById('pagination');
+    
+    if (!reviewsList) return;
+    
+    if (!allReviews || allReviews.length === 0) {
+        reviewsList.innerHTML = '<div class="empty-state">Нет отзывов</div>';
+        paginationDiv.style.display = 'none';
+        return;
+    }
+    
+    // Вычисляем страницы
+    const totalPages = Math.ceil(allReviews.length / reviewsPerPage);
+    const start = (page - 1) * reviewsPerPage;
+    const end = start + reviewsPerPage;
+    const pageReviews = allReviews.slice(start, end);
+    
+    // Отображаем отзывы текущей страницы
+    const html = pageReviews.map(review => {
         const date = new Date(review.date);
-        const formattedDate = date.toLocaleDateString('ru-RU', {
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric'
-        });
+        const formattedDate = !isNaN(date) 
+            ? date.toLocaleDateString('ru-RU', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric'
+              })
+            : review.date;
         
-        const stars = '★'.repeat(Math.round(review.rating)) + '☆'.repeat(5 - Math.round(review.rating));
+        const rating = Math.round(review.rating);
+        const stars = '★'.repeat(rating) + '☆'.repeat(5 - rating);
         
         return `
             <div class="review-card">
@@ -283,27 +379,72 @@ function renderReviews(reviews) {
         `;
     }).join('');
     
-    document.getElementById('reviewsList').innerHTML = html;
+    reviewsList.innerHTML = html;
+    
+    // Создаем пагинацию
+    if (totalPages > 1) {
+        paginationDiv.style.display = 'flex';
+        
+        let paginationHtml = '';
+        
+        // Кнопка "Предыдущая"
+        paginationHtml += `<button onclick="changePage(${page - 1})" ${page === 1 ? 'disabled' : ''}>
+            <i class="fas fa-chevron-left"></i>
+        </button>`;
+        
+        // Номера страниц
+        for (let i = 1; i <= totalPages; i++) {
+            if (i === page) {
+                paginationHtml += `<button class="active" onclick="changePage(${i})">${i}</button>`;
+            } else {
+                paginationHtml += `<button onclick="changePage(${i})">${i}</button>`;
+            }
+        }
+        
+        // Кнопка "Следующая"
+        paginationHtml += `<button onclick="changePage(${page + 1})" ${page === totalPages ? 'disabled' : ''}>
+            <i class="fas fa-chevron-right"></i>
+        </button>`;
+        
+        paginationDiv.innerHTML = paginationHtml;
+    } else {
+        paginationDiv.style.display = 'none';
+    }
+}
+
+function changePage(page) {
+    const totalPages = Math.ceil(allReviews.length / reviewsPerPage);
+    
+    if (page < 1 || page > totalPages) {
+        return;
+    }
+    
+    currentPage = page;
+    renderReviewsPage(currentPage);
+    
+    // Плавный скролл к началу отзывов
+    document.getElementById('reviewsList').scrollIntoView({ behavior: 'smooth' });
 }
 
 function sortReviews(reviews, sortBy) {
-    return reviews.sort((a, b) => {
-        switch(sortBy) {
-            case 'newest':
-                return new Date(b.date) - new Date(a.date);
-            case 'oldest':
-                return new Date(a.date) - new Date(b.date);
-            case 'highest':
-                return (b.rating || 0) - (a.rating || 0);
-            case 'lowest':
-                return (a.rating || 0) - (b.rating || 0);
-            default:
-                return 0;
-        }
-    });
+    const sorted = [...reviews];
+    
+    switch(sortBy) {
+        case 'newest':
+            return sorted.sort((a, b) => new Date(b.date) - new Date(a.date));
+        case 'oldest':
+            return sorted.sort((a, b) => new Date(a.date) - new Date(b.date));
+        case 'highest':
+            return sorted.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+        case 'lowest':
+            return sorted.sort((a, b) => (a.rating || 0) - (b.rating || 0));
+        default:
+            return sorted;
+    }
 }
 
 function escapeHtml(text) {
+    if (!text) return '';
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
