@@ -30,7 +30,7 @@
     </div>
 
     @if ($settings && $settings->yandex_maps_url)
-        @if(isset($paginated) && $paginated->count() > 0)
+        @if(isset($reviews) && $reviews->count() > 0)
             <div class="rating-block">
                 <span class="platform-name">Яндекс Карты</span>
                 <span class="rating-value">
@@ -44,7 +44,7 @@
                 <span>{{ $settings->total_reviews ?? 0 }} отзывов</span>
             </div>
 
-            @foreach ($paginated as $review)
+            @foreach ($reviews as $review)
                 <div class="review-card">
                     <div class="review-header">
                         <span>{{ $review['author'] }}</span>
@@ -61,7 +61,7 @@
                 </div>
             @endforeach
 
-            <div class="pagination-container">{{ $paginated->appends(['sort' => $sort])->links() }}</div>
+            <div class="pagination-container">{{ $reviews->appends(['sort' => $sort])->links() }}</div>
         @else
             <div class="review-card">No reviews found for this URL. Please check the URL and try again.</div>
         @endif
