@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\YandexMapsSetting;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use GuzzleHttp\Client;
 use Illuminate\Support\Facades\Log;
 
@@ -15,83 +16,123 @@ class YandexMapsController extends Controller
             $validated = $request->validate([
                 'yandex_maps_url' => 'required|url',
             ]);
-            
+
+            $settings = YandexMapsSetting::updateOrCreate(
+                ['id' => 1],
+                ['yandex_maps_url' => $validated['yandex_maps_url']]
+            );
+
             $orgId = $this->extractOrganizationId($validated['yandex_maps_url']);
             
-            if (!$orgId) {
-                return back()->with('error', 'Invalid Yandex Maps URL format. URL must contain an organization ID, e.g., "yandex.ru/maps/org/123456789".');
-            }
-            
-            $apiKey = config('services.yandex_maps.api_key');
-            if (!$apiKey) {
-                Log::error('Yandex Maps API key is not set in config/services.php.');
-                return back()->with('error', 'The Yandex Maps API key has not been configured. Please contact the administrator.');
+            if ($orgId) {
+                $this->fetchReviewsAndRating($orgId, $settings);
             }
 
-            $client = new Client();
-            
-            try {
-                $response = $client->get("https://search-maps.yandex.ru/v1/", [
-                    'query' => [
-                        'apikey' => $apiKey,
-                        'text' => $orgId,
-                        'lang' => 'ru_RU',
-                        'type' => 'biz',
-                        'results' => 1,
-                        'snippets' => 'businessrating/1.x'
-                    ],
-                    'http_errors' => false
-                ]);
-                
-                $data = json_decode($response->getBody(), true);
-
-                if (empty($data['features'])) {
-                    return back()->with('error', 'Organization not found on Yandex Maps for the given URL.');
-                }
-
-                // According to the Yandex Search API docs, rating and reviews are in the 'Ratings' object.
-                $companyMetaData = $data['features'][0]['properties']['CompanyMetaData'] ?? null;
-                $ratingData = $companyMetaData['Ratings'] ?? null; 
-
-                YandexMapsSetting::updateOrCreate(
-                    ['id' => 1],
-                    [
-                        'yandex_maps_url' => $validated['yandex_maps_url'],
-                        'rating' => $ratingData['score'] ?? null,
-                        'total_reviews' => $ratingData['reviews'] ?? 0,
-                    ]
-                );
-                
-                return redirect()->route('yandex-maps.index')->with('success', 'Data fetched successfully!');
-                
-            } catch (\Exception $e) {
-                Log::error('Yandex Maps API error: ' . $e->getMessage());
-                return back()->with('error', 'Failed to fetch data from Yandex Maps API. See logs for more details.');
-            }
+            return redirect()->route('yandex-maps.index')->with('success', 'Data fetched successfully!');
         }
-        
-        $settings = YandexMapsSetting::first();
 
+        $settings = YandexMapsSetting::first();
+        
         if (!$settings || !$settings->yandex_maps_url) {
             return view('yandex-maps.connect');
         }
 
-        // The new API implementation does not fetch individual reviews.
-        // We pass an empty array for the 'reviews' variable to the view.
+        $reviews = session('yandex_reviews', []);
+        
+        $perPage = 5;
+        $currentPage = $request->get('page', 1);
+        $paginatedReviews = new LengthAwarePaginator(
+            array_slice($reviews, ($currentPage - 1) * $perPage, $perPage),
+            count($reviews),
+            $perPage,
+            $currentPage,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+
         return view('yandex-maps.index', [
             'settings' => $settings,
-            'reviews' => [],
-            'sort' => 'newest'
+            'reviews' => $paginatedReviews
         ]);
     }
-    
+
+    private function fetchReviewsAndRating($orgId, $settings)
+    {
+        $client = new Client([
+            'headers' => [
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept' => 'application/json',
+                'Accept-Language' => 'ru-RU,ru;q=0.9'
+            ],
+            'timeout' => 15
+        ]);
+
+        try {
+            // Получаем отзывы через неофициальный API Яндекс Карт
+            $response = $client->get("https://yandex.ru/maps/api/organizations/{$orgId}/reviews", [
+                'query' => [
+                    'lang' => 'ru_RU',
+                    'page' => 1,
+                    'pageSize' => 20,
+                    'sortBy' => 'date'
+                ]
+            ]);
+            
+            $data = json_decode($response->getBody(), true);
+            
+            if (isset($data['reviews']) && is_array($data['reviews'])) {
+                $reviews = [];
+                foreach ($data['reviews'] as $item) {
+                    // Извлекаем текст отзыва
+                    $text = '';
+                    if (isset($item['text'])) {
+                        $text = $item['text'];
+                    } elseif (isset($item['pros'])) {
+                        $text = $item['pros'];
+                        if (isset($item['cons'])) {
+                            $text .= ' ' . $item['cons'];
+                        }
+                    }
+                    
+                    $reviews[] = [
+                        'author' => $item['author']['name'] ?? $item['user']['name'] ?? 'Аноним',
+                        'date' => date('Y-m-d', strtotime($item['date'] ?? $item['createdAt'] ?? 'now')),
+                        'rating' => $item['rating'] ?? $item['stars'] ?? null,
+                        'text' => trim($text)
+                    ];
+                }
+                
+                session(['yandex_reviews' => $reviews]);
+            }
+            
+            // Обновляем рейтинг и количество
+            if (isset($data['rating'])) {
+                $settings->rating = $data['rating'];
+                $settings->total_reviews = $data['total'] ?? count($data['reviews'] ?? []);
+                $settings->save();
+            }
+            
+        } catch (\Exception $e) {
+            Log::error('Yandex Maps API error: ' . $e->getMessage());
+            session(['yandex_reviews' => []]);
+        }
+    }
+
     private function extractOrganizationId($url)
     {
-        // Extracts the numerical organization ID from a Yandex Maps URL.
-        // e.g., https://yandex.ru/maps/org/some_name/123456789/?ll=... -> 123456789
-        if (preg_match('/\/org\/[a-zA-Z_-]+\/([0-9]+)/', $url, $matches) || preg_match('/\/org\/([0-9]+)/', $url, $matches)) {
-            return $matches[1];
+        // Ищем ID организации в разных форматах URL
+        $patterns = [
+            '/\/org\/(?:[^\/]+\/)?(\d+)/',
+            '/organization\/(\d+)/',
+            '/maps\/(\d+)/',
+            '/biz\/(\d+)/'
+        ];
+        
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $url, $matches)) {
+                return $matches[1];
+            }
         }
+        
         return null;
     }
 }

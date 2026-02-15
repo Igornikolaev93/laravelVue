@@ -42,6 +42,29 @@
             <div class="stars">{{ str_repeat('★', $ratingValue) . str_repeat('☆', 5 - $ratingValue) }}</div>
             <span>{{ $settings->total_reviews ?? 0 }} отзывов</span>
         </div>
+
+        @if(isset($reviews) && $reviews->count() > 0)
+            @foreach ($reviews as $review)
+                <div class="review-card">
+                    <div class="review-header">
+                        <span>{{ $review['author'] }}</span>
+                        <span>{{ $review['date'] }}</span>
+                        @if(!empty($review['rating']) && is_numeric($review['rating']))
+                            @php
+                                $reviewRating = round((float)$review['rating']);
+                                $reviewRating = max(0, min(5, $reviewRating));
+                            @endphp
+                            <div class="stars">{{ str_repeat('★', $reviewRating) . str_repeat('☆', 5 - $reviewRating) }}</div>
+                        @endif
+                    </div>
+                    <div>{{ $review['text'] }}</div>
+                </div>
+            @endforeach
+
+            <div class="pagination-container">{{ $reviews->links() }}</div>
+        @else
+            <div class="review-card">No reviews found for this URL. Please check the URL and try again.</div>
+        @endif
     @endif
 </div>
 @endsection
