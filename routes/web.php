@@ -3,11 +3,13 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\YandexMapsController;
 
-// корневой маршрут на наш контроллер
+// Корневой маршрут
 Route::get('/', [YandexMapsController::class, 'index'])->name('home');
 
-// Остальные маршруты
-Route::get('/yandex-maps', [YandexMapsController::class, 'index'])->name('yandex-maps.index');
-Route::get('/yandex-maps/settings', [YandexMapsController::class, 'settings'])->name('yandex-maps.settings');
-Route::post('/yandex-maps/connect', [YandexMapsController::class, 'connect'])->name('yandex-maps.connect');
-Route::post('/yandex-maps/fetch-reviews', [YandexMapsController::class, 'fetchReviews'])->name('yandex-maps.fetch-reviews');
+// Маршруты для Яндекс отзывов
+Route::prefix('yandex-maps')->name('yandex-maps.')->group(function () {
+    Route::get('/', [YandexMapsController::class, 'index'])->name('index');
+    Route::get('/settings', [YandexMapsController::class, 'settings'])->name('settings');
+    Route::post('/connect', [YandexMapsController::class, 'connect'])->name('connect');
+    Route::post('/fetch-reviews', [YandexMapsController::class, 'fetchReviews'])->name('fetch-reviews');
+});
