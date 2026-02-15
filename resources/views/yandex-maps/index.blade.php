@@ -2,19 +2,9 @@
 
 @section('content')
 <style>
-    /* --- STYLES FOR REVIEWS DISPLAY --- */
-    .reviews-main-container {
-        padding: 10px 30px;
-    }
-    .reviews-header {
-        display: flex;
-        justify-content: flex-end;
-        margin-bottom: 20px;
-    }
-    .reviews-header-icon {
-        font-size: 20px;
-        color: #909AB4;
-    }
+    .reviews-main-container { padding: 10px 30px; }
+    .reviews-header { display: flex; justify-content: flex-end; margin-bottom: 20px; }
+    .reviews-header-icon { font-size: 20px; color: #909AB4; }
     .review-card-new {
         background-color: #F7F8FA;
         border: 1px solid #E5E5E5;
@@ -31,21 +21,14 @@
         font-size: 14px;
         margin-bottom: 15px;
         gap: 15px;
+        flex-wrap: wrap;
     }
-    .review-card-new-author strong {
-        font-size: 15px;
-        font-weight: 600;
-    }
-    .review-card-new-text {
-        line-height: 1.6;
-        color: #363740;
-        font-size: 14px;
-    }
-    .no-reviews, .fetch-status {
-        text-align: center;
-        padding: 40px;
-        color: #6C757D;
-    }
+    .review-card-new-author strong { font-size: 15px; font-weight: 600; }
+    .review-card-new-text { line-height: 1.6; color: #363740; font-size: 14px; }
+    .no-reviews, .fetch-status { text-align: center; padding: 40px; color: #6C757D; }
+    .rating-stars { display: flex; gap: 2px; margin: 10px 0; }
+    .star-filled { color: #FBBC04; }
+    .star-empty { color: #DCE4EA; }
 
     @keyframes fadeIn {
         from { opacity: 0; transform: translateY(-10px); }
@@ -58,98 +41,70 @@
         <div class="reviews-header">
             <span class="reviews-header-icon"><i class="fas fa-external-link-alt"></i></span>
         </div>
+        
+        <div id="reviewsStats" style="margin-bottom: 20px; display: none;">
+            <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+                <div style="font-size: 24px; font-weight: 600; color: #363740;" id="averageRating"></div>
+                <div id="ratingStars" class="rating-stars"></div>
+                <div style="color: #6C757D; font-size: 14px;" id="totalReviews"></div>
+            </div>
+        </div>
+        
         <div id="fetchStatus" class="fetch-status" style="display: none;"></div>
         <div id="reviewsList"></div>
+
+        <script>
+            document.addEventListener('DOMContentLoaded', ()=>loadYandexReviews('{{ $settings->yandex_maps_url }}'));
+
+            async function loadYandexReviews(url) {
+                const s=document.getElementById('fetchStatus'), l=document.getElementById('reviewsList'), stats=document.getElementById('reviewsStats');
+                s.style.display='block'; s.textContent='Загрузка отзывов...'; l.innerHTML='';
+                
+                try {
+                    const r=await fetch('{{ route("yandex-maps.fetch-reviews") }}',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({url})});
+                    const d=await r.json();
+                    if(!r.ok) throw new Error(d.error||'Ошибка загрузки');
+                    
+                    s.style.display='none';
+                    if(d.reviews?.length) {
+                        if(d.stats) {
+                            stats.style.display='block';
+                            document.getElementById('averageRating').textContent=d.stats.average_rating||'0';
+                            document.getElementById('ratingStars').innerHTML=renderStars(parseFloat(d.stats.average_rating||0));
+                            document.getElementById('totalReviews').textContent=`Всего отзывов: ${d.stats.total_reviews||d.reviews.length}`;
+                        }
+                        renderReviews(d.reviews);
+                    } else l.innerHTML='<div class="no-reviews">Нет отзывов</div>';
+                } catch(e) { s.textContent=`❌ Ошибка: ${e.message}`; console.error(e); }
+            }
+
+            function renderStars(r) {
+                let s='';
+                for(let i=0;i<5;i++) s+= i < r ? '<span class="star-filled">★</span>' : '<span class="star-empty">★</span>';
+                return s;
+            }
+
+            function renderReviews(reviews) {
+                document.getElementById('reviewsList').innerHTML=reviews.map(r=>{
+                    const d=r.date?new Date(r.date):new Date();
+                    return `<div class="review-card-new">
+                        <div class="review-card-new-header">
+                            <span>${!isNaN(d)?new Intl.DateTimeFormat('ru-RU',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).format(d):'Дата не указана'}</span>
+                            <span class="branch">филиал 1</span>
+                        </div>
+                        <div class="review-card-new-author"><strong>${escape(r.author||'Аноним')}</strong></div>
+                        <div class="rating-stars">${renderStars(r.rating||0)}</div>
+                        <div class="review-card-new-text">${escape(r.text||'Нет текста')}</div>
+                    </div>`;
+                }).join('');
+            }
+
+            const escape=(u)=>u?u.replace(/[&<>]|(?<=[^\\])"/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[m]):'';
+        </script>
     @else
         <div class="no-reviews">
             <p>Чтобы увидеть отзывы, перейдите в раздел "Настройка" и подключите Яндекс.Карты.</p>
         </div>
     @endif
 </div>
-
-@if ($settings && $settings->yandex_maps_url)
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        loadYandexReviews('{{ $settings->yandex_maps_url }}');
-    });
-
-    async function loadYandexReviews(url) {
-        const statusDiv = document.getElementById('fetchStatus');
-        const reviewsList = document.getElementById('reviewsList');
-        
-        statusDiv.style.display = 'block';
-        statusDiv.textContent = 'Загрузка отзывов...';
-
-        try {
-            const response = await fetch('{{ route("yandex-maps.fetch-reviews") }}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                },
-                body: JSON.stringify({ url })
-            });
-            
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Ошибка при загрузке отзывов');
-            }
-            
-            const reviews = await response.json();
-            statusDiv.style.display = 'none';
-            renderReviews(reviews);
-            
-        } catch (error) {
-            statusDiv.textContent = `❌ Ошибка: ${error.message}`;
-            console.error('Error loading reviews:', error);
-        }
-    }
-
-    function renderReviews(reviews) {
-        const reviewsList = document.getElementById('reviewsList');
-        if (!reviews || reviews.length === 0) {
-            reviewsList.innerHTML = '<div class="no-reviews">Нет отзывов для отображения.</div>';
-            return;
-        }
-        
-        reviewsList.innerHTML = reviews.map(review => {
-            const date = review.date ? new Date(review.date) : new Date();
-            const formattedDate = !isNaN(date) ? 
-                new Intl.DateTimeFormat('ru-RU', { 
-                    year: 'numeric', 
-                    month: '2-digit', 
-                    day: '2-digit', 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
-                }).format(date) : 'Дата не указана';
-            
-            return `
-                <div class="review-card-new">
-                    <div class="review-card-new-header">
-                        <span>${formattedDate}</span>
-                        <span class="branch">филиал 1</span>
-                        <span class="icon"><i class="fas fa-map-marker-alt"></i></span>
-                    </div>
-                    <div class="review-card-new-author">
-                        <strong>${escapeHtml(review.author || 'Аноним')}</strong>
-                    </div>
-                    <div class="review-card-new-text">
-                        ${escapeHtml(review.text || 'Нет текста отзыва')}
-                    </div>
-                </div>
-            `;
-        }).join('');
-    }
-
-    function escapeHtml(unsafe) {
-        return unsafe
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
-    }
-</script>
-@endif
-
 @endsection
