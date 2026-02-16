@@ -16,17 +16,15 @@
 
     <div class="account-name">Название аккаунта</div>
 
-    <!-- активное меню -->
-    <a href="{{ route('yandex-maps.index') }}" class="menu-item">
+    <a href="{{ route('yandex-maps.index') }}" class="menu-item active">
         <i class="fas fa-tools"></i>
         <span>Отзывы</span>
     </a>
 
-    <div class="sub-menu">
+    <div class="sub-menu active">
         <a href="{{ route('yandex-maps.index') }}" class="sub-item">Отзывы</a>
         <a href="{{ route('yandex-maps.settings') }}" class="sub-item">Настройка</a>
     </div>
 
-    <!-- нижний декоративный селектор (можно просто отступ) -->
     <div style="margin-top: auto; height: 40px;"></div>
 </aside>
