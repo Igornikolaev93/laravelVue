@@ -1,420 +1,458 @@
 @extends('layouts.app')
 
 @section('content')
-<style>
-    .url-info {
-        background: #f8f9fa;
-        padding: 20px;
-        border-radius: 12px;
-        margin-bottom: 30px;
-        border: 1px solid #e9ecef;
-    }
-    
-    .url-info p {
-        margin-bottom: 15px;
-        word-break: break-all;
-        color: #495057;
-    }
-    
-    .btn {
-        display: inline-block;
-        padding: 10px 20px;
-        background: #6c757d;
-        color: white;
-        text-decoration: none;
-        border-radius: 6px;
-        font-size: 14px;
-        transition: background 0.2s;
-    }
-    
-    .btn:hover {
-        background: #5a6268;
-    }
-    
-    .reviews-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-        gap: 20px;
-        margin-top: 20px;
-    }
-    
-    .review-card {
-        background: white;
-        border: 1px solid #e9ecef;
-        border-radius: 12px;
-        padding: 20px;
-        transition: transform 0.2s, box-shadow 0.2s;
-    }
-    
-    .review-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-    
-    .review-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 12px;
-        padding-bottom: 12px;
-        border-bottom: 1px solid #e9ecef;
-    }
-    
-    .review-author {
-        font-weight: 600;
-        color: #2c3e50;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-    
-    .review-author i {
-        color: #6c757d;
-    }
-    
-    .review-date {
-        color: #6c757d;
-        font-size: 13px;
-    }
-    
-    .review-rating {
-        color: #ffc107;
-        margin-bottom: 12px;
-        font-size: 16px;
-        letter-spacing: 2px;
-    }
-    
-    .review-text {
-        color: #2c3e50;
-        line-height: 1.6;
-        font-size: 14px;
-        max-height: 150px;
-        overflow-y: auto;
-        padding-right: 10px;
-    }
-    
-    .review-text::-webkit-scrollbar {
-        width: 4px;
-    }
-    
-    .review-text::-webkit-scrollbar-track {
-        background: #f1f1f1;
-    }
-    
-    .review-text::-webkit-scrollbar-thumb {
-        background: #888;
-        border-radius: 4px;
-    }
-    
-    .loading {
-        text-align: center;
-        padding: 60px;
-        color: #6c757d;
-    }
-    
-    .loading i {
-        margin-right: 8px;
-    }
-    
-    .error {
-        background: #f8d7da;
-        color: #721c24;
-        padding: 15px;
-        border-radius: 8px;
-        margin: 20px 0;
-        border: 1px solid #f5c6cb;
-    }
-    
-    .empty-state {
-        text-align: center;
-        padding: 60px;
-        color: #6c757d;
-    }
-    
-    .empty-state i {
-        font-size: 48px;
-        margin-bottom: 20px;
-        color: #dee2e6;
-    }
-    
-    .stats-container {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 20px;
-        margin-bottom: 30px;
-    }
-    
-    .stat-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 20px;
-        border-radius: 12px;
-        text-align: center;
-    }
-    
-    .stat-value {
-        font-size: 36px;
-        font-weight: 700;
-        margin-bottom: 5px;
-    }
-    
-    .stat-label {
-        font-size: 14px;
-        opacity: 0.9;
-    }
-    
-    .sort-select {
-        width: 200px;
-        padding: 10px;
-        border: 1px solid #e9ecef;
-        border-radius: 6px;
-        margin-bottom: 20px;
-        background: white;
-        cursor: pointer;
-    }
-    
-    .sort-select:focus {
-        outline: none;
-        border-color: #667eea;
-    }
-    
-    .pagination {
-        display: flex;
-        justify-content: center;
-        gap: 10px;
-        margin-top: 30px;
-    }
-    
-    .pagination button {
-        padding: 8px 16px;
-        border: 1px solid #dee2e6;
-        background: white;
-        border-radius: 6px;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-    
-    .pagination button:hover {
-        background: #e9ecef;
-    }
-    
-    .pagination button.active {
-        background: #667eea;
-        color: white;
-        border-color: #667eea;
-    }
-</style>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Mulish:wght@400;500;600;700&family=Inter:wght@600&display=swap" rel="stylesheet">
+    <!-- Font Awesome for icons (replacing SVGs) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        /* styles.css */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
 
-@if($settings && $settings->yandex_maps_url)
-    <div class="url-info">
-        <p><i class="fas fa-link"></i> <strong>URL:</strong> {{ $settings->yandex_maps_url }}</p>
-        <a href="{{ route('yandex-maps.settings') }}" class="btn">
-            <i class="fas fa-edit"></i> Изменить URL
-        </a>
-    </div>
+/* Main Container */
+.main-container,
+[data-layer="Подключение площадок"] {
+    width: 1381px;
+    background: white;
+    position: relative;
+    min-height: 2014px;
+    margin: 20px auto;
+    box-shadow: 0 0 20px rgba(0,0,0,0.05);
+}
 
-    <div id="status" class="loading">
-        <i class="fas fa-spinner fa-spin"></i> Загрузка отзывов...
-    </div>
-    
-    <div id="statsContainer" class="stats-container" style="display: none;"></div>
-    
-    <select id="sortSelect" class="sort-select" style="display: none;">
-        <option value="newest">Сначала новые</option>
-        <option value="oldest">Сначала старые</option>
-        <option value="highest">Высокий рейтинг</option>
-        <option value="lowest">Низкий рейтинг</option>
-    </select>
-    
-    <div id="reviewsList" class="reviews-grid"></div>
-    
-    <div id="pagination" class="pagination" style="display: none;"></div>
-@else
-    <div class="empty-state">
-        <i class="fas fa-map-marked-alt"></i>
-        <h3>URL не настроен</h3>
-        <p>Перейдите в <a href="{{ route('yandex-maps.settings') }}">настройки</a> чтобы подключить Яндекс.Карты.</p>
-    </div>
-@endif
+/* Header */
+.header,
+[data-layer="Rectangle 121"] {
+    width: 100%;
+    height: 75px;
+    background: white;
+    border-bottom: 1px solid #DCE4EA;
+}
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    @if($settings && $settings->yandex_maps_url)
-        setTimeout(() => {
-            loadReviews('{{ $settings->yandex_maps_url }}');
-        }, 100);
-    @endif
-});
+/* Top icons */
+.top-icon,
+[data-layer="Rectangle 122"] {
+    position: absolute;
+    right: 90px;
+    top: 14px;
+    font-size: 24px;
+    color: #909AB4;
+}
 
-let allReviews = [];
-let currentPage = 1;
-const reviewsPerPage = 6;
+.vector-icon {
+    position: absolute;
+    font-size: 20px;
+    color: #909AB4;
+}
 
-async function loadReviews(url) {
-    const statusEl = document.getElementById('status');
-    const statsContainer = document.getElementById('statsContainer');
-    const sortSelect = document.getElementById('sortSelect');
+.phone-icon {
+    right: 77px;
+    top: 26px;
+}
+
+.arrow-icon {
+    right: 69px;
+    top: 31px;
+}
+
+/* Sidebar */
+.sidebar,
+[data-layer="fon"] {
+    width: 280px;
+    background: #F6F8FA;
+    box-shadow: 0px 4px 3px #E5E5E5;
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    height: 2014px;
+}
+
+/* Logo */
+.logo,
+[data-layer="Daily Grow"] {
+    position: absolute;
+    left: 55.25px;
+    top: 34.37px;
+    z-index: 2;
+}
+
+.logo-text {
+    font-family: 'Mulish', sans-serif;
+    font-size: 24px;
+    font-weight: bold;
+    color: #363740;
+}
+
+/* Logo decorative elements - replacing SVGs */
+.logo-decor {
+    position: absolute;
+    width: 6px;
+    height: 10px;
+    z-index: 2;
+}
+
+.decor-1 {
+    left: 29.69px;
+    top: 30px;
+    background: #03A3EA;
+    clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+.decor-2 {
+    left: 34.94px;
+    top: 35.25px;
+    background: #039DE5;
+    clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+.decor-3 {
+    left: 40.19px;
+    top: 40.21px;
+    background: #0256B2;
+    clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+.decor-4 {
+    left: 29.69px;
+    top: 35.25px;
+    background: #0399E2;
+    clip-path: polygon(100% 0, 100% 100%, 0 50%);
+}
+
+.decor-5 {
+    left: 34.94px;
+    top: 40.21px;
+    background: #0381D1;
+    clip-path: polygon(100% 0, 100% 100%, 0 50%);
+}
+
+.decor-6 {
+    left: 29px;
+    top: 45.17px;
+    width: 12px;
+    height: 13px;
+    background: #0256B2;
+    clip-path: polygon(0 0, 100% 40%, 40% 100%);
+}
+
+/* Menu */
+.menu,
+[data-layer="Menu"] {
+    width: 249px;
+    height: 52px;
+    position: absolute;
+    left: 15px;
+    top: 120px;
+    overflow: hidden;
+    z-index: 3;
+}
+
+.menu-selector,
+[data-layer="Menu"] [data-layer="Selector"] {
+    width: 249px;
+    height: 48px;
+    background: white;
+    box-shadow: 0px 2px 1px rgba(0, 0, 0, 0.02);
+    border-radius: 12px;
+}
+
+.menu-base {
+    width: 280px;
+    height: 52px;
+}
+
+.menu-selector-transparent {
+    width: 249px;
+    height: 48px;
+    background: rgba(255, 255, 255, 0);
+    border-radius: 12px;
+}
+
+.menu-text,
+[data-layer="Menu"] [data-layer="Overview"] {
+    position: absolute;
+    left: 51px;
+    top: 14px;
+    color: #363740;
+    font-size: 16px;
+    font-weight: 500;
+}
+
+.menu-icon {
+    position: absolute;
+    left: 15px;
+    top: 12px;
+    color: #DCE4EA;
+    font-size: 20px;
+}
+
+/* Sidebar selectors */
+.sidebar-selector,
+[data-layer="Selector"][style*="width: 249px; height: 23px;"] {
+    width: 249px;
+    height: 23px;
+    background: white;
+    box-shadow: 0px 2px 1px rgba(0, 0, 0, 0.02);
+    border-radius: 12px;
+    position: absolute;
+    left: 15px;
+    top: 201px;
+    z-index: 2;
+}
+
+/* Sidebar menu items */
+.sidebar-menu-item,
+[data-layer="Overview"] {
+    color: #363740;
+    font-size: 12px;
+    font-weight: 500;
+    position: absolute;
+    z-index: 2;
+}
+
+.reviews {
+    left: 65px;
+    top: 180px;
+}
+
+.settings {
+    left: 65px;
+    top: 205px;
+}
+
+/* Account name */
+.account-name,
+[data-layer="3"] {
+    position: absolute;
+    left: 15px;
+    top: 72px;
+    color: #6C757D;
+    font-size: 16px;
+    font-family: 'Mulish', sans-serif;
+    font-weight: 700;
+    line-height: 20px;
+    letter-spacing: 0.20px;
+    z-index: 2;
+}
+
+/* Additional selector */
+.additional-selector,
+[data-layer="Selector"][style*="width: 51px;"] {
+    width: 51px;
+    height: 47.08px;
+    position: absolute;
+    left: 32px;
+    top: 670px;
+    box-shadow: 0px 2px 1px rgba(0, 0, 0, 0.02);
+    border-radius: 12px;
+    z-index: 2;
+}
+
+/* Small arrow */
+.small-arrow {
+    position: absolute;
+    left: 4px;
+    top: 5.73px;
+    color: #6C757D;
+    font-size: 8px;
+    z-index: 3;
+}
+
+/* Main content - Campaign title */
+.campaign-title,
+[data-layer="Кампании"] {
+    position: absolute;
+    left: 315px;
+    top: 93px;
+    color: #252733;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 20px;
+    letter-spacing: 0.20px;
+}
+
+/* Input label */
+.input-label,
+[data-layer="группа 31"] {
+    position: absolute;
+    left: 315px;
+    top: 128px;
+    color: #6C757D;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 20px;
+    letter-spacing: 0.20px;
+}
+
+/* Input container */
+.input-container,
+[data-layer=""] {
+    width: 480px;
+    height: 24px;
+    padding: 6px 14px;
+    position: absolute;
+    left: 315px;
+    top: 157px;
+    background: white;
+    border-radius: 6px;
+    outline: 1px solid #DCE4EA;
+    outline-offset: -1px;
+    display: inline-flex;
+    align-items: center;
+    gap: 15px;
+}
+
+/* Input text */
+.input-text,
+[data-layer*="https://yandex.ru"] {
+    width: 471px;
+    color: #788397;
+    font-size: 12px;
+    font-family: 'Mulish', sans-serif;
+    font-weight: 400;
+    text-decoration: underline;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Duplicate text (hidden) */
+.duplicate-text {
+    display: none;
+}
+
+/* Button base */
+.button-base,
+[data-layer="Base"][style*="background: #339AF0;"] {
+    width: 128px;
+    height: 25px;
+    position: absolute;
+    left: 315px;
+    top: 199px;
+    background: #339AF0;
+    border-radius: 6px;
+}
+
+/* Button container */
+.button-container,
+[data-layer="Text"] {
+    width: 96px;
+    height: 14.17px;
+    position: absolute;
+    left: 331px;
+    top: 204px;
+    overflow: hidden;
+    border-radius: 6px;
+}
+
+/* Button text */
+.button-text,
+[data-layer="+ Add Dashlet"] {
+    position: absolute;
+    left: 10px;
+    top: -2px;
+    color: white;
+    font-size: 14px;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1400px) {
+    .main-container {
+        width: 100%;
+        margin: 0;
+    }
     
-    try {
-        statusEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Загрузка отзывов...';
+    .sidebar {
+        height: auto;
+        min-height: 100vh;
+    }
+}
+    </style>
+    <div data-layer="Подключение площадок" class="main-container">
+        <!-- Header -->
+        <div data-layer="Rectangle 121" class="header"></div>
         
-        const response = await fetch('{{ route("yandex-maps.fetch-reviews") }}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({ url })
-        });
+        <!-- Top right icons (replaced SVG with text) -->
+        <div data-layer="Rectangle 122" class="top-icon">
+            <i class="far fa-square"></i>
+        </div>
+        <div data-layer="Vector" class="vector-icon phone-icon">
+            <i class="fas fa-mobile-alt"></i>
+        </div>
+        <div data-layer="Vector" class="vector-icon arrow-icon">
+            <i class="fas fa-arrow-right"></i>
+        </div>
 
-        const data = await response.json();
+        <!-- Sidebar -->
+        <div data-layer="fon" class="sidebar"></div>
+        
+        <!-- Logo (replaced SVG with text) -->
+        <div data-layer="Daily Grow" class="logo">
+            <span class="logo-text">Daily Grow</span>
+        </div>
 
-        if (!response.ok || !data.success) {
-            throw new Error(data.error || 'Ошибка загрузки отзывов');
-        }
-        
-        statusEl.style.display = 'none';
-        
-        if (data.reviews && data.reviews.length > 0) {
-            allReviews = data.reviews;
-            
-            statsContainer.style.display = 'grid';
-            statsContainer.innerHTML = `
-                <div class="stat-card">
-                    <div class="stat-value">${data.stats.total_reviews}</div>
-                    <div class="stat-label">всего отзывов</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value">${data.stats.average_rating}</div>
-                    <div class="stat-label">средний рейтинг</div>
-                </div>
-            `;
-            
-            currentPage = 1;
-            renderReviewsPage(currentPage);
-            
-            sortSelect.style.display = 'block';
-            sortSelect.onchange = function() {
-                allReviews = sortReviews([...allReviews], this.value);
-                currentPage = 1;
-                renderReviewsPage(currentPage);
-            };
-            
-        } else {
-            document.getElementById('reviewsList').innerHTML = 
-                '<div class="empty-state">На этой странице нет отзывов</div>';
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        
-        statusEl.innerHTML = `
-            <div class="error">
-                <i class="fas fa-exclamation-circle"></i> 
-                ${error.message}
+        <!-- Logo decorative elements (replaced SVGs with styled divs) -->
+        <div class="logo-decor decor-1"></div>
+        <div class="logo-decor decor-2"></div>
+        <div class="logo-decor decor-3"></div>
+        <div class="logo-decor decor-4"></div>
+        <div class="logo-decor decor-5"></div>
+        <div class="logo-decor decor-6"></div>
+
+        <!-- Menu -->
+        <div data-layer="Menu" class="menu">
+            <div data-layer="Selector" class="menu-selector"></div>
+            <div data-layer="Base" class="menu-base"></div>
+            <div data-layer="Selector" class="menu-selector-transparent"></div>
+            <div data-layer="Overview" class="menu-text">Отзывы</div>
+            <div data-layer="User Interface / Repair Tool" class="menu-icon">
+                <i class="fas fa-tools"></i>
             </div>
-        `;
-    }
-}
+        </div>
 
-function renderReviewsPage(page) {
-    const reviewsList = document.getElementById('reviewsList');
-    const paginationDiv = document.getElementById('pagination');
-    
-    if (!allReviews || allReviews.length === 0) {
-        reviewsList.innerHTML = '<div class="empty-state">Нет отзывов</div>';
-        paginationDiv.style.display = 'none';
-        return;
-    }
-    
-    const totalPages = Math.ceil(allReviews.length / reviewsPerPage);
-    const start = (page - 1) * reviewsPerPage;
-    const end = start + reviewsPerPage;
-    const pageReviews = allReviews.slice(start, end);
-    
-    reviewsList.innerHTML = pageReviews.map(review => {
-        const date = new Date(review.date);
-        const formattedDate = !isNaN(date) 
-            ? date.toLocaleDateString('ru-RU', {
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric'
-              })
-            : review.date;
+        <!-- Sidebar menu items -->
+        <div data-layer="Selector" class="sidebar-selector"></div>
+        <div data-layer="Overview" class="sidebar-menu-item reviews">Отзывы</div>
+        <div data-layer="Overview" class="sidebar-menu-item settings">Настройка</div>
         
-        const rating = Math.min(5, Math.max(0, Math.round(review.rating)));
-        const stars = '★'.repeat(rating) + '☆'.repeat(5 - rating);
+        <!-- Account name -->
+        <div data-layer="3" class="account-name">Название аккаунта</div>
         
-        return `
-            <div class="review-card">
-                <div class="review-header">
-                    <span class="review-author">
-                        <i class="fas fa-user-circle"></i> ${escapeHtml(review.author)}
-                    </span>
-                    <span class="review-date">
-                        <i class="far fa-calendar-alt"></i> ${formattedDate}
-                    </span>
-                </div>
-                <div class="review-rating">${stars}</div>
-                <div class="review-text">${escapeHtml(review.text)}</div>
+        <!-- Additional selector -->
+        <div data-layer="Selector" class="additional-selector"></div>
+        
+        <!-- Small arrow icon (replaced SVG) -->
+        <div class="small-arrow">
+            <i class="fas fa-chevron-down"></i>
+        </div>
+
+        <!-- Main content -->
+        <div data-layer="Кампании" class="campaign-title">Подключить Яндекс</div>
+        <div data-layer="группа 31" class="input-label">Укажите ссылку на Яндекс, пример</div>
+        
+        <!-- Input field -->
+        <div data-layer="" class="input-container">
+            <div data-layer="https://yandex.ru/maps/org/samoye_populyarnoye_kafe/1010501395/reviews/" class="input-text">
+                https://yandex.ru/maps/org/samoye_populyarnoye_kafe/1010501395/reviews/
             </div>
-        `;
-    }).join('');
-    
-    if (totalPages > 1) {
-        paginationDiv.style.display = 'flex';
-        
-        let paginationHtml = '';
-        
-        paginationHtml += `<button onclick="changePage(${page - 1})" ${page === 1 ? 'disabled' : ''}>\n            <i class="fas fa-chevron-left"></i>\n        </button>`;
-        
-        for (let i = 1; i <= totalPages; i++) {
-            paginationHtml += `<button onclick="changePage(${i})" ${i === page ? 'class="active"' : ''}>${i}</button>`;
-        }
-        
-        paginationHtml += `<button onclick="changePage(${page + 1})" ${page === totalPages ? 'disabled' : ''}>\n            <i class="fas fa-chevron-right"></i>\n        </button>`;
-        
-        paginationDiv.innerHTML = paginationHtml;
-    } else {
-        paginationDiv.style.display = 'none';
-    }
-}
+        </div>
 
-function changePage(page) {
-    const totalPages = Math.ceil(allReviews.length / reviewsPerPage);
-    
-    if (page < 1 || page > totalPages) {
-        return;
-    }
-    
-    currentPage = page;
-    renderReviewsPage(currentPage);
-    
-    document.getElementById('reviewsList').scrollIntoView({ behavior: 'smooth' });
-}
+        <!-- Duplicate text (hidden as it seems to be a duplicate) -->
+        <div class="duplicate-text">https://yandex.ru/maps/org/samoye_populyarnoye_kafe/1010501395/reviews/</div>
 
-function sortReviews(reviews, sortBy) {
-    const sorted = [...reviews];
-    
-    switch(sortBy) {
-        case 'newest':
-            return sorted.sort((a, b) => new Date(b.date) - new Date(a.date));
-        case 'oldest':
-            return sorted.sort((a, b) => new Date(a.date) - new Date(b.date));
-        case 'highest':
-            return sorted.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-        case 'lowest':
-            return sorted.sort((a, b) => (a.rating || 0) - (b.rating || 0));
-        default:
-            return sorted;
-    }
-}
-
-function escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-</script>
+        <!-- Button -->
+        <div data-layer="Base" class="button-base"></div>
+        <div data-layer="Text" class="button-container">
+            <div data-layer="+ Add Dashlet" class="button-text">Сохранить</div>
+        </div>
+    </div>
 @endsection
