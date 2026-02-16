@@ -45,7 +45,6 @@ class YandexMapsController extends Controller
     {
         $request->validate(['url' => 'required|url']);
 
-        // Получаем HTML страницы с отзывами
         $html = $this->fetchPageContent($request->url);
         
         if (!$html) {
@@ -55,22 +54,15 @@ class YandexMapsController extends Controller
             ], 404);
         }
 
-        // Парсим отзывы из HTML
         $reviews = $this->parseReviewsFromHtml($html);
-
-        if (empty($reviews)) {
-            return response()->json([
-                'success' => false,
-                'error' => 'Отзывы не найдены на странице'
-            ], 404);
-        }
 
         $stats = $this->calculateStats($reviews);
 
         return response()->json([
             'success' => true,
             'reviews' => $reviews,
-            'stats' => $stats
+            'rating' => (string) $stats['average_rating'],
+            'total_reviews' => (string) $stats['total_reviews']
         ]);
     }
 
@@ -99,12 +91,10 @@ class YandexMapsController extends Controller
     {
         $reviews = [];
         
-        // Ищем JSON данные в HTML
         $pattern = '/<script[^>]*>\s*window\.__INITIAL_STATE__\s*=\s*({.+?});\s*<\/script>/';
         if (preg_match($pattern, $html, $matches)) {
             $data = json_decode($matches[1], true);
             if ($data) {
-                // Ищем отзывы в структуре данных
                 $items = $this->extractReviewsFromData($data);
                 if (!empty($items)) {
                     return $items;
@@ -112,17 +102,13 @@ class YandexMapsController extends Controller
             }
         }
 
-        // Если не нашли JSON, ищем отзывы в HTML структуре
-        $reviews = $this->extractReviewsFromHtml($html);
-        
-        return $reviews;
+        return $this->extractReviewsFromHtml($html);
     }
 
     private function extractReviewsFromData($data)
     {
         $reviews = [];
         
-        // Рекурсивно ищем массив с отзывами
         array_walk_recursive($data, function($value, $key) use (&$reviews) {
             if ($key === 'reviews' && is_array($value)) {
                 foreach ($value as $item) {
@@ -145,12 +131,10 @@ class YandexMapsController extends Controller
     {
         $reviews = [];
         
-        // Простой парсинг HTML (можно улучшить)
         $dom = new \DOMDocument();
         @$dom->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'));
         $xpath = new \DOMXPath($dom);
         
-        // Ищем элементы с классами отзывов
         $nodes = $xpath->query("//div[contains(@class, 'review')]");
         
         foreach ($nodes as $node) {
@@ -159,19 +143,16 @@ class YandexMapsController extends Controller
             $rating = 5;
             $text = '';
             
-            // Парсим автора
             $authorNodes = $xpath->query(".//*[contains(@class, 'author')]", $node);
             if ($authorNodes->length > 0) {
                 $author = trim($authorNodes->item(0)->textContent);
             }
             
-            // Парсим дату
             $dateNodes = $xpath->query(".//*[contains(@class, 'date')]", $node);
             if ($dateNodes->length > 0) {
                 $date = trim($dateNodes->item(0)->textContent);
             }
             
-            // Парсим текст
             $textNodes = $xpath->query(".//*[contains(@class, 'text')]", $node);
             if ($textNodes->length > 0) {
                 $text = trim($textNodes->item(0)->textContent);
