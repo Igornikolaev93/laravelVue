@@ -5,61 +5,76 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ config('app.name', 'Laravel') }}</title>
     <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Mulish:wght@400;500;600;700&family=Inter:wght@600&display=swap" rel="stylesheet">
     <!-- Styles -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        body {
-            font-family: 'Nunito', sans-serif;
-            background-color: #f4f6f9;
-            color: #2c3e50;
+        * {
             margin: 0;
             padding: 0;
+            box-sizing: border-box;
         }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 30px;
-        }
-        .main-header {
-            background-color: #ffffff;
-            padding: 20px 30px;
-            border-bottom: 1px solid #e9ecef;
+        body {
+            font-family: 'Mulish', sans-serif;
+            background: #f0f2f5;
             display: flex;
-            justify-content: space-between;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .app {
+            max-width: 1381px;
+            width: 100%;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            height: 75px;
+            border-bottom: 1px solid #DCE4EA;
+            display: flex;
             align-items: center;
+            justify-content: flex-end;
+            padding: 0 40px;
+            gap: 24px;
         }
-        .main-header .logo {
-            font-size: 24px;
-            font-weight: 700;
-            color: #3490dc;
-            text-decoration: none;
+        .header-icon {
+            color: #909AB4;
+            font-size: 22px;
         }
-        .main-nav a {
-            margin-left: 20px;
-            text-decoration: none;
-            color: #555;
-            font-weight: 600;
+
+        .main-row {
+            display: flex;
+            align-items: stretch;
         }
-        .main-content {
-            background-color: #ffffff;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+
+        .content {
+            flex: 1;
+            padding: 30px 35px;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
         }
+
     </style>
 </head>
 <body>
-    <header class="main-header">
-        <a href="{{ url('/') }}" class="logo">{{ config('app.name', 'Laravel') }}</a>
-        <nav class="main-nav">
-            <a href="{{ route('home') }}">Отзывы</a>
-            <a href="{{ route('yandex-maps.settings') }}">Настройки</a>
-        </nav>
-    </header>
+    <div class="app">
+        <header class="header">
+            <i class="fas fa-square header-icon"></i>
+            <i class="fas fa-mobile-alt header-icon"></i>
+            <i class="fas fa-arrow-right header-icon"></i>
+        </header>
 
-    <main class="container">
-        @yield('content')
-    </main>
+        <div class="main-row">
+            @include('layouts.sidebar')
+            <main class="content">
+                @yield('content')
+            </main>
+        </div>
+    </div>
 </body>
 </html>

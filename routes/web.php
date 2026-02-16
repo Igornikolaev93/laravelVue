@@ -12,5 +12,4 @@ Route::prefix('yandex-maps')->name('yandex-maps.')->group(function () {
     Route::get('/settings', [YandexMapsController::class, 'settings'])->name('settings');
     Route::post('/connect', [YandexMapsController::class, 'connect'])->name('connect');
     Route::post('/fetch-reviews', [YandexMapsController::class, 'fetchReviews'])->name('fetch-reviews');
-    Route::get('/reviews', [YandexMapsController::class, 'reviews'])->name('reviews');
 });

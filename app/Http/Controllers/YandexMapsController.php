@@ -15,11 +15,6 @@ class YandexMapsController extends Controller
         return view('yandex-maps.index', compact('settings'));
     }
 
-    public function reviews()
-    {
-        return view('yandex-maps.reviews');
-    }
-
     public function settings()
     {
         $settings = YandexMapsSetting::first();
@@ -38,7 +33,7 @@ class YandexMapsController extends Controller
                 ['yandex_maps_url' => $request->yandex_maps_url]
             );
 
-            return redirect()->route('yandex-maps.reviews')
+            return redirect()->route('yandex-maps.index')
                 ->with('success', 'URL успешно сохранен!');
         } catch (\Exception $e) {
             return redirect()->back()
