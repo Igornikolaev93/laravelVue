@@ -17,13 +17,13 @@
     <div class="account-name">Название аккаунта</div>
 
     <!-- активное меню -->
-    <a href="{{ route('yandex-maps.reviews') }}" class="menu-item">
+    <a href="{{ route('yandex-maps.index') }}" class="menu-item">
         <i class="fas fa-tools"></i>
         <span>Отзывы</span>
     </a>
 
     <div class="sub-menu">
-        <a href="{{ route('yandex-maps.reviews') }}" class="sub-item">Отзывы</a>
+        <a href="{{ route('yandex-maps.index') }}" class="sub-item">Отзывы</a>
         <a href="{{ route('yandex-maps.settings') }}" class="sub-item">Настройка</a>
     </div>
 
