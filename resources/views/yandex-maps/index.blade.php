@@ -2,6 +2,51 @@
 
 @section('content')
 <style>
+.platform-card {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0px 3px 6px rgba(92,101,111,0.30);
+    border: 1px solid #E0E7EC;
+    padding: 20px 24px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+}
+.platform-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+.rating-block {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.stars {
+    display: flex;
+    gap: 6px;
+    color: #FBBC04;
+    font-size: 22px;
+}
+.stars .grey {
+    color: #6C757D;
+    opacity: 0.4;
+}
+.rating-value {
+    font-size: 40px;
+    font-weight: 500;
+    color: #363740;
+    line-height: 1;
+}
+.reviews-total {
+    font-size: 12px;
+    font-weight: 700;
+    color: #363740;
+    border-top: 2px solid #F1F4F7;
+    padding-top: 8px;
+    margin-top: 4px;
+}
 .input-group {
     display: flex;
     flex-wrap: wrap;
@@ -32,6 +77,7 @@
     padding: 10px 16px;
     font-size: 12px;
     color: #788397;
+    text-decoration: underline;
     width: 100%;
     font-family: 'Mulish', sans-serif;
 }
@@ -49,7 +95,7 @@
     white-space: nowrap;
 }
 .reviews-feed {
-    display: flex;
+    display: none; /* Initially hidden */
     flex-direction: column;
     gap: 20px;
 }
@@ -84,17 +130,67 @@
     font-size: 12px;
     color: #363740;
 }
-</style>
-    <div class="input-group">
-        <div class="field">
-            <label>Укажите ссылку на Яндекс, пример</label>
-            <input type="text" id="yandex_maps_url" value="https://yandex.ru/maps/46/kirov/?ll=49.680826%2C58.602742&mode=poi&poi%5Bpoint%5D=49.682197%2C58.597895&poi%5Buri%5D=ymapsbm1%3A%2F%2Forg%3Foid%3D198060798118&z=13">
-        </div>
-        <button class="save-btn">Сохранить</button>
-    </div>
+.review-meta .phone {
+    font-weight: 700;
+    font-size: 10px;
+    color: #363740;
+}
+.review-icons {
+    display: flex;
+    gap: 8px;
+    color: #DCE4EA;
+    font-size: 14px;
+}
+.location-marker {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: white;
+    border-radius: 20px;
+    padding: 2px 12px 2px 8px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #363740;
+}
+.location-marker i {
+    color: #FF4433;
+    font-size: 16px;
+}
+.review-text {
+    font-size: 12px;
+    color: black;
+    line-height: 1.5;
+    max-width: 780px;
+}
 
-    <div class="reviews-feed">
+</style>
+
+<div class="platform-card">
+    <div class="platform-info">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <i class="fas fa-map-marker-alt" style="color:#FF4433; font-size: 20px;"></i>
+            <span style="font-weight: 600; background: #F0F2F5; padding: 6px 16px; border-radius: 30px; font-size: 14px;">Яндекс Карты</span>
+        </div>
+        <div class="rating-block">
+            <span class="rating-value">0.0</span>
+            <div class="stars">
+                <i class="fas fa-star grey"></i><i class="fas fa-star grey"></i><i class="fas fa-star grey"></i><i class="fas fa-star grey"></i><i class="fas fa-star grey"></i>
+            </div>
+        </div>
     </div>
+    <div class="reviews-total">Всего отзывов: 0</div>
+</div>
+
+<div class="input-group">
+    <div class="field">
+        <label>Укажите ссылку на Яндекс, пример</label>
+        <input type="text" id="yandex_maps_url" value="https://yandex.ru/maps/org/samoye_populyarnoye_kafe/1010501395/reviews/">
+    </div>
+    <button class="save-btn">Сохранить</button>
+</div>
+
+<div class="reviews-feed">
+</div>
 
 <script>
     document.querySelector('.save-btn').addEventListener('click', function (e) {
@@ -110,6 +206,7 @@
             return;
         }
 
+        reviewsFeed.style.display = 'flex';
         reviewsFeed.innerHTML = '<p>Загрузка отзывов...</p>';
 
         fetch('{{ route('yandex-maps.fetch-reviews') }}', {
@@ -127,16 +224,50 @@
             return response.json();
         })
         .then(data => {
+            const platformCard = document.querySelector('.platform-card');
+            const ratingValue = platformCard.querySelector('.rating-value');
+            const reviewsTotal = platformCard.querySelector('.reviews-total');
+            const starsContainer = platformCard.querySelector('.stars');
+
             if (data.success) {
                 inputGroup.style.display = 'none';
+
+                // Update stats
+                ratingValue.textContent = data.stats.average_rating;
+                reviewsTotal.textContent = 'Всего отзывов: ' + data.stats.total_reviews;
+                
+                let starsHtml = '';
+                let avg_rating = Math.round(data.stats.average_rating);
+                for (let i = 1; i <= 5; i++) {
+                    if (i <= avg_rating) {
+                        starsHtml += '<i class="fas fa-star"></i>';
+                    } else {
+                        starsHtml += '<i class="fas fa-star grey"></i>';
+                    }
+                }
+                starsContainer.innerHTML = starsHtml;
+
+                // Update reviews
                 let reviewsHtml = '';
                 if (data.reviews && data.reviews.length > 0) {
                     data.reviews.forEach(review => {
+                         let reviewStars = '';
+                         for (let i = 1; i <= 5; i++) {
+                             if (i <= review.rating) {
+                                 reviewStars += '<i class="fas fa-star"></i>';
+                             } else {
+                                 reviewStars += '<i class="fas fa-star grey"></i>';
+                             }
+                         }
+
                         reviewsHtml += `
                             <div class="review-card">
                                 <div class="review-inner">
                                     <div class="review-header">
                                         <span style="font-weight:700; font-size:12px;">${review.date}</span>
+                                         <div class="stars" style="font-size: 14px; color: #FBBC04;">
+                                             ${reviewStars}
+                                         </div>
                                     </div>
                                     <div class="review-meta">
                                         <span class="name">${review.author}</span>
