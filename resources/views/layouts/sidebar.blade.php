@@ -16,14 +16,14 @@
 
     <div class="account-name">Название аккаунта</div>
 
-    <a href="{{ route('yandex-maps.index') }}" class="menu-item active">
+    <a href="{{ route('yandex-maps.index') }}" class="menu-item {{ request()->routeIs('yandex-maps.*') ? 'active' : '' }}">
         <i class="fas fa-tools"></i>
         <span>Отзывы</span>
     </a>
 
-    <div class="sub-menu active">
-        <a href="{{ route('yandex-maps.index') }}" class="sub-item">Отзывы</a>
-        <a href="{{ route('yandex-maps.settings') }}" class="sub-item">Настройка</a>
+    <div class="sub-menu {{ request()->routeIs('yandex-maps.*') ? 'active' : '' }}">
+        <a href="{{ route('yandex-maps.index') }}" class="sub-item {{ request()->routeIs('yandex-maps.index') ? 'active' : '' }}">Отзывы</a>
+        <a href="{{ route('yandex-maps.settings') }}" class="sub-item {{ request()->routeIs('yandex-maps.settings') ? 'active' : '' }}">Настройка</a>
     </div>
 
     <div style="margin-top: auto; height: 40px;"></div>
