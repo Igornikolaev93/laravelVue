@@ -56,6 +56,13 @@ class YandexMapsController extends Controller
 
         $reviews = $this->parseReviewsFromHtml($html);
 
+        foreach ($reviews as &$review) {
+            if (isset($review['text'])) {
+                $review['text'] = $this->makeLinksClickable($review['text']);
+            }
+        }
+        unset($review); 
+
         $stats = $this->calculateStats($reviews);
 
         return response()->json([
@@ -64,6 +71,15 @@ class YandexMapsController extends Controller
             'rating' => (string) $stats['average_rating'],
             'total_reviews' => (string) $stats['total_reviews']
         ]);
+    }
+
+    private function makeLinksClickable($text)
+    {
+        return preg_replace(
+            '/(https?:\/\/[a-zA-Z0-9-.]+\.[a-zA-Z]{2,3}(\/\S*)?)/',
+            '<a href="$1" target="_blank" style="color: #007bff; text-decoration: underline;">$1</a>',
+            $text
+        );
     }
 
     private function fetchPageContent($url)
