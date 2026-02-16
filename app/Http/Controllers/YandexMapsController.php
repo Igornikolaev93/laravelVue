@@ -17,8 +17,7 @@ class YandexMapsController extends Controller
 
     public function settings()
     {
-        $settings = YandexMapsSetting::first();
-        return view('yandex-maps.settings', compact('settings'));
+        return redirect()->route('yandex-maps.index');
     }
 
     public function connect(Request $request)
