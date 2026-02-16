@@ -2,92 +2,73 @@
 
 @section('content')
 <style>
-    .settings-form {
-        max-width: 600px;
-        margin: 0 auto;
-        background: #fff;
-        padding: 30px;
-        border-radius: 12px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    .container {
+        padding: 20px;
+        font-family: 'Mulish', sans-serif;
     }
-    .form-group {
-        margin-bottom: 25px;
+    .reviews-container {
+        margin-top: 20px;
     }
-    .form-label {
-        display: block;
-        margin-bottom: 10px;
-        font-weight: 600;
-        color: #333;
+    .review {
+        border-bottom: 1px solid #eee;
+        padding: 10px 0;
     }
-    .form-control {
-        width: 100%;
-        padding: 12px;
-        border: 1px solid #ccc;
-        border-radius: 8px;
-        transition: border-color 0.2s;
+    .review-author {
+        font-weight: bold;
     }
-    .form-control:focus {
-        outline: none;
-        border-color: #3490dc;
-    }
-    .btn-primary {
-        padding: 12px 25px;
-        background-color: #3490dc;
-        color: white;
-        border: none;
-        border-radius: 8px;
-        cursor: pointer;
-        transition: background-color 0.2s;
-    }
-    .btn-primary:hover {
-        background-color: #2779bd;
-    }
-    .alert {
-        padding: 15px;
-        margin-bottom: 20px;
-        border-radius: 8px;
-    }
-    .alert-success {
-        background-color: #d4edda;
-        color: #155724;
-        border: 1px solid #c3e6cb;
-    }
-    .alert-error {
-        background-color: #f8d7da;
-        color: #721c24;
-        border: 1px solid #f5c6cb;
+    .review-date {
+        color: #888;
+        font-size: 0.9em;
     }
 </style>
 
-<div class="settings-form">
-    <h3 style="text-align: center; margin-bottom: 30px;">Настройки Яндекс.Карт</h3>
+<div class="container">
+    <h2>Настройки Яндекс Карт</h2>
 
-    @if (session('success'))
-        <div class="alert alert-success">
-            {{ session('success') }}
-        </div>
+    @if ($settings && $settings->yandex_maps_url)
+        <p><strong>Текущий URL:</strong> {{ $settings->yandex_maps_url }}</p>
+        <button id="fetch-reviews-btn" class="button-base">Загрузить отзывы</button>
+    @else
+        <p>URL Яндекс Карт не настроен. Перейдите на <a href="{{ route('yandex-maps.index') }}">страницу подключения</a>.</p>
     @endif
 
-    @if (session('error'))
-        <div class="alert alert-error">
-            {{ session('error') }}
-        </div>
-    @endif
-
-    <form action="{{ route('yandex-maps.connect') }}" method="POST">
-        @csrf
-        <div class="form-group">
-            <label for="yandex_maps_url" class="form-label">URL организации на Яндекс.Картах</label>
-            <input type="text" name="yandex_maps_url" id="yandex_maps_url" class="form-control" 
-                   placeholder="https://yandex.ru/maps/org/...." 
-                   value="{{ old('yandex_maps_url', $settings->yandex_maps_url ?? '') }}">
-            @error('yandex_maps_url')
-                <div style="color: #e3342f; font-size: 14px; margin-top: 5px;">{{ $message }}</div>
-            @enderror
-        </div>
-        <div style="text-align: center;">
-            <button type="submit" class="btn btn-primary">Сохранить</button>
-        </div>
-    </form>
+    <div id="reviews-container" class="reviews-container"></div>
 </div>
+
+<script>
+    document.getElementById('fetch-reviews-btn').addEventListener('click', function() {
+        const url = '{{ $settings->yandex_maps_url ?? '' }}';
+        if (!url) {
+            alert('URL не указан');
+            return;
+        }
+
+        fetch('{{ route("yandex-maps.fetch-reviews") }}?url=' + encodeURIComponent(url))
+            .then(response => response.json())
+            .then(data => {
+                const reviewsContainer = document.getElementById('reviews-container');
+                reviewsContainer.innerHTML = ''; // Clear previous reviews
+
+                if (data.success && data.reviews.length > 0) {
+                    let reviewsHtml = '<h3>Отзывы:</h3>';
+                    data.reviews.forEach(review => {
+                        reviewsHtml += `
+                            <div class="review">
+                                <div class="review-author">${review.author}</div>
+                                <div class="review-date">${review.date}</div>
+                                <div>${review.text}</div>
+                            </div>
+                        `;
+                    });
+                    reviewsContainer.innerHTML = reviewsHtml;
+                } else {
+                    reviewsContainer.innerHTML = '<p>' + (data.error || 'Отзывы не найдены.') + '</p>';
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching reviews:', error);
+                document.getElementById('reviews-container').innerHTML = '<p>Ошибка при загрузке отзывов.</p>';
+            });
+    });
+</script>
 @endsection
