@@ -204,6 +204,7 @@
         font-weight: 500;
         position: absolute;
         z-index: 2;
+        cursor: pointer;
     }
 
     .reviews {
@@ -748,6 +749,29 @@
     document.getElementById('yandex_maps_url').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
             fetchReviews();
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const settingsButton = document.querySelector('.sidebar-menu-item.settings');
+        const reviewsButton = document.querySelector('.sidebar-menu-item.reviews');
+        const initialView = document.getElementById('initial-view');
+        const reviewsFeed = document.getElementById('reviewsFeed');
+
+        if(settingsButton) {
+            settingsButton.addEventListener('click', function() {
+                initialView.style.display = 'block';
+                reviewsFeed.style.display = 'none';
+            });
+        }
+
+        if(reviewsButton) {
+            reviewsButton.addEventListener('click', function() {
+                if (reviewsFeed.innerHTML.trim() !== '') {
+                    initialView.style.display = 'none';
+                    reviewsFeed.style.display = 'flex';
+                }
+            });
         }
     });
 </script>
