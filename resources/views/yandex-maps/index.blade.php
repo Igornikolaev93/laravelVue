@@ -145,6 +145,7 @@
         top: 120px;
         overflow: hidden;
         z-index: 3;
+        cursor: pointer;
     }
 
     .menu-selector {
@@ -195,6 +196,7 @@
         left: 15px;
         top: 201px;
         z-index: 2;
+        cursor: pointer;
     }
 
     /* Sidebar menu items */
@@ -204,6 +206,12 @@
         font-weight: 500;
         position: absolute;
         z-index: 2;
+        cursor: pointer;
+        transition: color 0.2s;
+    }
+    
+    .sidebar-menu-item:hover {
+        color: #339AF0;
     }
 
     .reviews {
@@ -355,15 +363,96 @@
         cursor: pointer;
     }
 
-    /* Reviews feed */
-    .reviews-feed {
-        display: none;
-        flex-direction: column;
+    /* Content row - для расположения отзывов и платформы в строку */
+    .content-row {
+        position: absolute;
+        left: 315px;
+        top: 250px;
+        width: 1036px;
+        display: none; /* Скрыто по умолчанию */
+        flex-direction: row;
         gap: 20px;
+        align-items: flex-start;
+    }
+
+    /* Левая колонка - Яндекс лейбл и отзывы */
+    .left-column {
+        display: flex;
+        flex-direction: column;
+        width: 744px;
+        flex-shrink: 0;
+        gap: 20px;
+    }
+
+    /* Яндекс лейбл над отзывами */
+    .yandex-label {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 0;
+        background: white;
+        padding: 12px 20px;
+        /*border-radius: 12px;
+        box-shadow: 0px 1px 3px rgba(0,0,0,0.05);
+        border: 1px solid #E0E7EC;*/
+    }
+    
+    .yandex-badge {
+        font-weight: 600;
+        background: #F0F2F5;
+        padding: 6px 16px;
+        border-radius: 30px;
+        font-size: 14px;
+    }
+
+    /* Loading container - показывается во время загрузки */
+    .loading-container {
         position: absolute;
         left: 315px;
         top: 250px;
         width: 744px;
+        display: none;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .loading {
+        text-align: center;
+        padding: 40px;
+        font-size: 14px;
+        color: #6C757D;
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0px 3px 6px rgba(92,101,111,0.30);
+        border: 1px solid #E0E7EC;
+    }
+
+    .loading i {
+        margin-right: 8px;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    /* Error message */
+    .error-message {
+        color: #dc3545;
+        padding: 20px;
+        text-align: center;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    /* Reviews feed - левая колонка с отзывами */
+    .reviews-feed {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        width: 100%;
     }
 
     .review-card {
@@ -440,27 +529,23 @@
         max-width: 780px;
     }
 
-    /* Platform card */
     .platform-card {
-        position: absolute;
-        left: 306px;
-        top: 126px;
-        width: 759px;
-        height: 155px;
+        width: 272px;
         background: white;
-        box-shadow: 0px 3px 6px rgba(92,101,111,0.30);
+        box-shadow: 0px 1px 6px rgba(92, 101, 111, 0.30);
         border-radius: 12px;
         border: 1px solid #E0E7EC;
+        padding: 20px;
+        flex-shrink: 0;
         display: flex;
-        align-items: center;
-        padding: 20px 24px;
-        justify-content: space-between;
+        flex-direction: column;
     }
 
     .platform-info {
         display: flex;
-        align-items: center;
+        flex-direction: column;
         gap: 15px;
+        width: 100%;
     }
 
     .rating-block {
@@ -493,51 +578,9 @@
         font-weight: 700;
         color: #363740;
         border-top: 2px solid #F1F4F7;
-        padding-top: 8px;
-        margin-top: 4px;
-    }
-
-    /* Яндекс лейбл */
-    .yandex-label {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-    
-    .yandex-badge {
-        font-weight: 600;
-        background: #F0F2F5;
-        padding: 6px 16px;
-        border-radius: 30px;
-        font-size: 14px;
-    }
-
-    /* Loading indicator */
-    .loading {
-        text-align: center;
-        padding: 40px;
-        font-size: 14px;
-        color: #6C757D;
-    }
-
-    .loading i {
-        margin-right: 8px;
-        animation: spin 1s linear infinite;
-    }
-
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
-
-    /* Error message */
-    .error-message {
-        color: #dc3545;
-        padding: 20px;
-        text-align: center;
-        background: #fff;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        padding-top: 12px;
+        margin-top: 10px;
+        width: 100%;
     }
 
     /* Responsive adjustments */
@@ -551,6 +594,12 @@
             height: auto;
             min-height: 100vh;
         }
+        
+        .content-row {
+            width: calc(100% - 335px);
+            right: 20px;
+            flex-wrap: wrap;
+        }
     }
 </style>
 
@@ -558,13 +607,6 @@
     <!-- Header -->
     <div class="header"></div>
     
-    <!-- Top right icons -->
-    <div class="top-icon">
-        <i class="far fa-square"></i>
-    </div>
-    <div class="vector-icon phone-icon">
-        <i class="fas fa-mobile-alt"></i>
-    </div>
     <div class="vector-icon arrow-icon">
         <i class="fas fa-arrow-right"></i>
     </div>
@@ -586,7 +628,7 @@
     <div class="logo-decor decor-6"></div>
 
     <!-- Menu -->
-    <div class="menu">
+    <div class="menu" onclick="window.location.href='{{ route('yandex-maps.index') }}'">
         <div class="menu-selector"></div>
         <div class="menu-base"></div>
         <div class="menu-selector-transparent"></div>
@@ -597,9 +639,9 @@
     </div>
 
     <!-- Sidebar menu items -->
-    <div class="sidebar-selector"></div>
-    <div class="sidebar-menu-item reviews">Отзывы</div>
-    <div class="sidebar-menu-item settings">Настройка</div>
+    <div class="sidebar-selector" onclick="window.location.href='{{ route('yandex-maps.index') }}'"></div>
+    <div class="sidebar-menu-item reviews" onclick="window.location.href='{{ route('yandex-maps.index') }}'">Отзывы</div>
+    <div class="sidebar-menu-item settings" onclick="showSettings()">Настройка</div>
     
     <!-- Account name -->
     <div class="account-name">Название аккаунта</div>
@@ -612,7 +654,6 @@
         <i class="fas fa-chevron-down"></i>
     </div>
 
-    <!-- Initial View -->
     <div id="initial-view">
         <div class="campaign-title">Подключить Яндекс</div>
         <div class="input-label">Укажите ссылку на Яндекс, пример</div>
@@ -627,9 +668,43 @@
         </div>
     </div>
 
-    <!-- Reviews Feed (initially hidden) -->
-    <div class="reviews-feed" id="reviewsFeed">
-        <!-- Reviews will be inserted here -->
+    <div class="loading-container" id="loadingContainer">
+        <div class="loading">
+            <i class="fas fa-spinner"></i> Загрузка отзывов...
+        </div>
+    </div>
+
+    
+    <div class="content-row" id="contentRow">
+        
+        <div class="left-column">
+            <div class="yandex-label" id="yandexLabel">
+                <i class="fas fa-map-marker-alt" style="color:#FF4433; font-size: 20px;"></i>
+                <span class="yandex-badge">Яндекс Карты</span>
+            </div>
+            
+           
+            <div class="reviews-feed" id="reviewsFeed">
+              
+            </div>
+        </div>
+
+     
+        <div class="platform-card" id="platformCard">
+            <div class="platform-info">
+                <div class="rating-block">
+                    <span class="rating-value" id="ratingValue">4.7</span>
+                    <div class="stars" id="starsContainer">
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="reviews-total" id="totalReviews">Всего отзывов: 1 145</div>
+        </div>
     </div>
 </div>
 
@@ -638,20 +713,24 @@
         const urlInput = document.getElementById('yandex_maps_url');
         const url = urlInput.value.trim();
         const reviewsFeed = document.getElementById('reviewsFeed');
+        const contentRow = document.getElementById('contentRow');
+        const loadingContainer = document.getElementById('loadingContainer');
         const initialView = document.getElementById('initial-view');
+        const ratingValue = document.getElementById('ratingValue');
+        const totalReviews = document.getElementById('totalReviews');
+        const starsContainer = document.getElementById('starsContainer');
 
         if (!url) {
             alert('Пожалуйста, введите URL');
             return;
         }
 
-        // Show loading state
-        reviewsFeed.style.display = 'flex';
-        reviewsFeed.innerHTML = `
-            <div class="loading">
-                <i class="fas fa-spinner"></i> Загрузка отзывов...
-            </div>
-        `;
+        // Скрываем начальный вид и контент (если был показан ранее)
+        initialView.style.display = 'none';
+        contentRow.style.display = 'none';
+        
+        // Показываем индикатор загрузки
+        loadingContainer.style.display = 'flex';
 
         // Make AJAX request to fetch reviews
         fetch('{{ route("yandex-maps.fetch-reviews") }}', {
@@ -669,35 +748,29 @@
             return response.json();
         })
         .then(data => {
+       
+            loadingContainer.style.display = 'none';
+            
             if (data.success) {
-                // Hide initial view
-                initialView.style.display = 'none';
+                const rating = data.rating || '4.7';
+                ratingValue.textContent = rating;
+                totalReviews.textContent = `Всего отзывов: ${data.total_reviews || '1 145'}`;
                 
-                // Build reviews HTML
+                
+                const starRating = parseFloat(rating);
+                const stars = starsContainer.children;
+                for (let i = 0; i < stars.length; i++) {
+                    if (i < Math.floor(starRating)) {
+                        stars[i].className = 'fas fa-star';
+                    } else if (i === Math.floor(starRating) && starRating % 1 >= 0.5) {
+                        stars[i].className = 'fas fa-star-half-alt';
+                    } else {
+                        stars[i].className = 'fas fa-star grey';
+                    }
+                }
+                
+             
                 let reviewsHtml = '';
-                
-                // Add platform info card
-                reviewsHtml += `
-                    <div class="platform-card">
-                        <div class="platform-info">
-                            <div class="yandex-label">
-                                <i class="fas fa-map-marker-alt" style="color:#FF4433; font-size: 20px;"></i>
-                                <span class="yandex-badge">Яндекс Карты</span>
-                            </div>
-                            <div class="rating-block">
-                                <span class="rating-value">${data.rating || '4.7'}</span>
-                                <div class="stars">
-                                    <i class="fas fa-star"></i>
-                                    <i class="fas fa-star"></i>
-                                    <i class="fas fa-star"></i>
-                                    <i class="fas fa-star"></i>
-                                    <i class="fas fa-star ${parseFloat(data.rating || '4.7') < 4.8 ? 'grey' : ''}"></i>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="reviews-total">Всего отзывов: ${data.total_reviews || '1 145'}</div>
-                    </div>
-                `;
 
                 if (data.reviews && data.reviews.length > 0) {
                     data.reviews.forEach(review => {
@@ -706,21 +779,17 @@
                                 <div class="review-inner">
                                     <div class="review-header">
                                         <span style="font-weight:700; font-size:12px;">${review.date || '12.09.2022 14:22'} Филиал 1</span>
-                                        <div class="review-icons">
-                                            <i class="far fa-square"></i>
-                                            <i class="fas fa-mobile-alt"></i>
-                                            <i class="fas fa-arrow-right"></i>
+                                        <div class="location-marker">
+                                            <i class="fas fa-map-pin"></i>
+                                            
                                         </div>
-                                    </div>
+                                        </div>
                                     <div style="display: flex; align-items: center; gap: 40px;">
                                         <div class="review-meta">
                                             <span class="name">${review.author || 'Наталья'}</span>
                                             <span class="phone">${review.phone || '+7 900 540 40 40'}</span>
                                         </div>
-                                        <div class="location-marker">
-                                            <i class="fas fa-map-pin"></i>
-                                            <span>Филиал 1</span>
-                                        </div>
+                            
                                     </div>
                                     <div class="review-text">
                                         ${review.text || 'Так, с чего начать... Разнообразная алкогольная продукция, множество закусок и обычных блюд. Кухня вкусная и разнообразная, от супа и салатов до мясных продуктов. Персонал молодые девушки, общительные и доброжелательные, всегда подскажут, вовремя принесут и вызовут такси. Отдыхали на летней веранде, свежо и тепло, в общем самое то в жаркую погоду. Сами залы не сильно рассмотрел, но видел что они удобные и просторные.'}
@@ -730,21 +799,33 @@
                         `;
                     });
                 } else {
-                    reviewsHtml += '<p style="text-align: center; padding: 40px; color: #6C757D;">Отзывов не найдено.</p>';
+                    reviewsHtml = '<p style="text-align: center; padding: 40px; color: #6C757D;">Отзывов не найдено.</p>';
                 }
                 reviewsFeed.innerHTML = reviewsHtml;
+                
+                
+                contentRow.style.display = 'flex';
 
             } else {
-                reviewsFeed.innerHTML = `<div class="error-message">Ошибка: ${data.error || 'Не удалось получить отзывы.'}</div>`;
+             
+                loadingContainer.innerHTML = `<div class="error-message">Ошибка: ${data.error || 'Не удалось получить отзывы.'}</div>`;
             }
         })
         .catch(error => {
-            reviewsFeed.innerHTML = '<div class="error-message">Произошла ошибка при запросе. Проверьте консоль для деталей.</div>';
+            loadingContainer.innerHTML = '<div class="error-message">Произошла ошибка при запросе. Проверьте консоль для деталей.</div>';
             console.error('Error:', error);
         });
     }
 
-    // Add event listener for Enter key in input
+    function showSettings() {
+        document.getElementById('contentRow').style.display = 'none';
+        // Скрываем контейнер загрузки
+        document.getElementById('loadingContainer').style.display = 'none';
+        // Показываем начальный вид с полем ввода ссылки
+        document.getElementById('initial-view').style.display = 'block';
+    }
+
+    
     document.getElementById('yandex_maps_url').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
             fetchReviews();
