@@ -207,14 +207,11 @@
         position: absolute;
         z-index: 2;
         cursor: pointer;
-<<<<<<< HEAD
         transition: color 0.2s;
     }
     
     .sidebar-menu-item:hover {
         color: #339AF0;
-=======
->>>>>>> 9cb6fd65a9d91ca70e5e8396d779863ab44a58a3
     }
 
     .reviews {
